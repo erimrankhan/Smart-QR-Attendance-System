@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Registration | Smart QR Attendance System</title>
+    <!-- Google Fonts & Font Awesome Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Global & Dashboard CSS -->
+    <link rel="stylesheet" href="../shared/styles.css">
+    <link rel="stylesheet" href="dashboard.css">
+
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 30px 20px;
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(13, 148, 136, 0.85) 100%), 
+                        url('https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=1600&auto=format&fit=crop') center/cover no-repeat;
+            font-family: var(--font-family);
+        }
+
+        .register-container {
+            width: 100%;
+            max-width: 620px;
+            background: var(--glass-card);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 40px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+            animation: fadeIn 0.4s ease;
+        }
+
+        .register-header {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+
+        .register-header .logo {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, var(--accent-teal), #0284c7);
+            border-radius: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 28px;
+            margin-bottom: 14px;
+            box-shadow: 0 8px 24px rgba(13, 148, 136, 0.4);
+        }
+
+        .register-header h2 {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .register-header p {
+            font-size: 13.5px;
+            color: var(--text-secondary);
+        }
+
+        .form-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 600px) {
+            .register-container {
+                padding: 24px 18px;
+            }
+
+            .form-grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--text-primary);
+            border-radius: var(--radius-md);
+            font-size: 13.5px;
+            font-family: inherit;
+            transition: all 0.25s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--accent-teal);
+            box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.25);
+        }
+
+        .btn-register {
+            width: 100%;
+            padding: 14px;
+            font-size: 15px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-teal), #0284c7);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            box-shadow: 0 6px 20px rgba(13, 148, 136, 0.35);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .btn-register:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(13, 148, 136, 0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="register-container">
+        <!-- Header -->
+        <div class="register-header">
+            <div class="logo">
+                <i class="fa-solid fa-chalkboard-user"></i>
+            </div>
+            <h2>Faculty Portal Registration</h2>
+            <p>Create your faculty account to manage QR attendance, classes & study materials</p>
+        </div>
+
+        <!-- Registration Form -->
+        <form id="faculty-register-form" style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="form-grid-2">
+                <!-- Full Name -->
+                <div class="form-group">
+                    <label for="name"><i class="fa-solid fa-user" style="color: var(--accent-teal);"></i> Full Name *</label>
+                    <input type="text" id="name" class="form-control" placeholder="Your Name" required>
+                </div>
+
+                <!-- Employee ID -->
+                <div class="form-group">
+                    <label for="employee_id"><i class="fa-solid fa-id-badge" style="color: var(--accent-cyan);"></i> Employee ID (Optional)</label>
+                    <input type="text" id="employee_id" class="form-control" placeholder="e.g. EMP-202601">
+                </div>
+            </div>
+
+            <div class="form-grid-2">
+                <!-- Email -->
+                <div class="form-group">
+                    <label for="email"><i class="fa-solid fa-envelope" style="color: var(--accent-teal);"></i> Institutional Email *</label>
+                    <input type="email" id="email" class="form-control" placeholder="Your Email Address" required>
+                </div>
+
+                <!-- Phone -->
+                <div class="form-group">
+                    <label for="phone"><i class="fa-solid fa-phone" style="color: var(--accent-amber);"></i> Contact Phone</label>
+                    <input type="tel" id="phone" class="form-control" placeholder="+91 9876543210">
+                </div>
+            </div>
+
+            <!-- Department Dropdown -->
+            <div class="form-group">
+                <label for="departmentSelect"><i class="fa-solid fa-building-columns" style="color: var(--accent-teal);"></i> Academic Department *</label>
+                <select id="departmentSelect" class="form-control" required>
+                    <option value="">Loading departments...</option>
+                </select>
+            </div>
+
+            <!-- Password -->
+            <div class="form-group">
+                <label for="password"><i class="fa-solid fa-lock" style="color: var(--accent-rose);"></i> Account Password *</label>
+                <input type="password" id="password" class="form-control" placeholder="••••••••" required minlength="6">
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="btn-register" id="register-btn">
+                <i class="fa-solid fa-user-plus"></i> Submit Faculty Registration
+            </button>
+        </form>
+
+        <!-- Footer -->
+        <div style="text-align: center; margin-top: 24px; font-size: 13.5px; color: var(--text-secondary); border-top: 1px dashed var(--glass-border); padding-top: 16px;">
+            Already have an active account? <a href="login.html" style="color: var(--accent-teal); font-weight: 700; text-decoration: none;">Login Here</a>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container"></div>
+
+    <!-- Utilities & Registration Logic Scripts -->
+    <script src="../shared/utils.js"></script>
+    <script src="register.js"></script>
+</body>
+</html>

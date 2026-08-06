@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Portal | Smart QR Attendance System</title>
+    <!-- Google Fonts & Font Awesome Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Html5-QRCode Camera Scanner CDN -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+    <!-- jsPDF & AutoTable CDN for Export Engine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+    <!-- Global & Shared Glassmorphism CSS -->
+    <link rel="stylesheet" href="../shared/styles.css">
+    <!-- Student Glassmorphism CSS -->
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+    <!-- Mobile Drawer Backdrop Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <div class="brand">
+                <div class="brand-logo">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                </div>
+                <div class="brand-text">
+                    <h2>Smart QR</h2>
+                    <p>Student Portal</p>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a class="nav-item active" id="nav-dashboard" data-view="dashboard-view">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a class="nav-item" id="nav-scan" data-view="scan-view">
+                    <i class="fa-solid fa-qrcode"></i>
+                    <span>Scan QR</span>
+                </a>
+                <a class="nav-item" id="nav-history" data-view="history-view">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Attendance & Analytics</span>
+                </a>
+                <a class="nav-item" id="nav-leaves-alerts" data-view="leaves-alerts-view">
+                    <i class="fa-solid fa-calendar-minus"></i>
+                    <span>Leaves & Alerts</span>
+                </a>
+                <a class="nav-item" id="nav-reports" data-view="reports-view">
+                    <i class="fa-solid fa-file-pdf"></i>
+                    <span>Reports & PDF</span>
+                </a>
+                <a class="nav-item" id="nav-materials" data-view="materials-view">
+                    <i class="fa-solid fa-folder-open"></i>
+                    <span>Study Materials</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer" style="border-top: 1px solid var(--glass-border); padding-top: 14px; margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
+                <!-- Thin & Attractive My Profile Widget (Positioned above Logout) -->
+                <a class="nav-item sidebar-profile-card" id="nav-profile" data-view="profile-view" style="padding: 8px 12px; border-radius: var(--radius-md); background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.2); display: flex; align-items: center; justify-content: space-between; text-decoration: none; transition: all 0.25s ease;">
+                    <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                        <div class="sidebar-avatar-small" id="sidebarAvatarContainer" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; border-radius: 50%; background: var(--accent-gradient); color: white; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                            S
+                        </div>
+                        <div style="min-width: 0; display: flex; flex-direction: column;">
+                            <span id="sidebar-student-name" style="font-size: 12.5px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">My Profile</span>
+                            <span style="font-size: 10.5px; color: var(--accent-primary); font-weight: 600;">Account Settings</span>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right" style="font-size: 11px; color: var(--text-muted);"></i>
+                </a>
+
+                <!-- Sidebar Logout Button -->
+                <button class="logout-btn sidebar-logout-btn" id="sidebarLogoutBtn" style="width: 100%; padding: 9px 12px; font-size: 12px; font-weight: 700; background: rgba(244, 63, 94, 0.12); color: var(--accent-rose); border: 1px solid rgba(244, 63, 94, 0.25); border-radius: var(--radius-md); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease;">
+                    <i class="fa-solid fa-sign-out-alt"></i>
+                    <span>Logout Account</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Top Header (Topbar) -->
+            <header class="top-header">
+                <div style="display: flex; align-items: center;">
+                    <button class="mobile-toggle-btn" id="mobileMenuToggle" title="Toggle Navigation Menu">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    <div class="page-title">
+                        <h1 id="view-title">Student Dashboard</h1>
+                        <p id="view-subtitle">Attendance analytics, QR scanning, profile & report generation</p>
+                    </div>
+                </div>
+                <div class="header-user">
+                    <!-- Redesigned Dark Mode Toggle Button -->
+                    <button id="themeToggle" class="icon-btn" title="Toggle Dark/Light Mode">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
+
+                    <!-- Notification Bell Icon Button -->
+                    <button id="notification-bell" class="icon-btn" title="System Notifications" onclick="toggleSystemNotificationModal()" style="position: relative;">
+                        <i class="fa-solid fa-bell"></i>
+                        <span class="notif-badge" id="notif-badge" style="display: none;">0</span>
+                    </button>
+
+                    <!-- Student Profile Info -->
+                    <div class="user-avatar" id="topbarAvatarContainer">S</div>
+                    <div class="user-info">
+                        <span class="user-name" id="student-name-display">Student Account</span>
+                        <span class="user-role" id="student-enrollment-display">Student</span>
+                    </div>
+
+                    <!-- Topbar Logout Button -->
+                    <button class="logout-btn" id="topbarLogoutBtn" title="Logout Account">
+                        <i class="fa-solid fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- MODULE 1: DASHBOARD VIEW -->
+            <section class="view-section active" id="dashboard-view">
+                <!-- Today's Attendance Banner -->
+                <div class="glass-panel" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(16, 185, 129, 0.2) 100%); border: 1px solid rgba(99, 102, 241, 0.3); padding: 22px 28px; box-shadow: 0 8px 32px 0 rgba(99, 102, 241, 0.15);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                        <div>
+                            <span style="font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 800; color: #818cf8; background: rgba(99, 102, 241, 0.15); padding: 4px 10px; border-radius: 12px; border: 1px solid rgba(99, 102, 241, 0.25);">Today's Session Status</span>
+                            <h2 id="today-status-title" style="font-size: 22px; font-weight: 800; margin-top: 8px;">Checking status...</h2>
+                            <p id="today-status-subtitle" style="font-size: 13.5px; color: var(--text-secondary); margin-top: 4px;"></p>
+                        </div>
+                        <button class="btn btn-primary" onclick="switchView('scan-view')" style="padding: 12px 22px; font-size: 14px; font-weight: 800; background: linear-gradient(135deg, var(--accent-emerald), #059669); border: none; box-shadow: 0 4px 18px rgba(16, 185, 129, 0.4); cursor: pointer; transition: all 0.3s ease;">
+                            <i class="fa-solid fa-qrcode" style="margin-right: 6px;"></i> Scan Attendance QR
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick Action Shortcuts Bar -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px;">
+                    <div class="quick-shortcut-card" onclick="switchView('scan-view')">
+                        <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                            <i class="fa-solid fa-qrcode"></i>
+                        </div>
+                        <div>
+                            <div style="font-size: 13.5px; font-weight: 700;">Scan QR Code</div>
+                            <div style="font-size: 11px; color: var(--text-muted);">Mark Attendance</div>
+                        </div>
+                    </div>
+                    <div class="quick-shortcut-card" onclick="switchView('history-view')">
+                        <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                            <i class="fa-solid fa-chart-line"></i>
+                        </div>
+                        <div>
+                            <div style="font-size: 13.5px; font-weight: 700;">Analytics</div>
+                            <div style="font-size: 11px; color: var(--text-muted);">Attendance %</div>
+                        </div>
+                    </div>
+                    <div class="quick-shortcut-card" onclick="switchView('leaves-alerts-view')">
+                        <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(99, 102, 241, 0.15); color: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                            <i class="fa-solid fa-plane-departure"></i>
+                        </div>
+                        <div>
+                            <div style="font-size: 13.5px; font-weight: 700;">Apply Leave</div>
+                            <div style="font-size: 11px; color: var(--text-muted);">Absence Request</div>
+                        </div>
+                    </div>
+                    <div class="quick-shortcut-card" onclick="switchView('materials-view')">
+                        <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                            <i class="fa-solid fa-folder-open"></i>
+                        </div>
+                        <div>
+                            <div style="font-size: 13.5px; font-weight: 700;">Study Notes</div>
+                            <div style="font-size: 11px; color: var(--text-muted);">View Materials</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="stats-grid" style="margin-bottom: 20px;">
+                    <div class="stat-card" style="border-top: 3px solid var(--accent-emerald);">
+                        <div class="stat-info">
+                            <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">Overall Attendance</span>
+                            <h2 id="stat-percentage" style="font-size: 28px; font-weight: 800; margin-top: 4px;">0%</h2>
+                        </div>
+                        <div class="stat-icon percentage" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald);">
+                            <i class="fa-solid fa-percent"></i>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-top: 3px solid var(--accent-cyan);">
+                        <div class="stat-info">
+                            <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">Total Sessions</span>
+                            <h2 id="stat-total-classes" style="font-size: 28px; font-weight: 800; margin-top: 4px;">0</h2>
+                        </div>
+                        <div class="stat-icon total" style="background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan);">
+                            <i class="fa-solid fa-book"></i>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-top: 3px solid var(--accent-primary);">
+                        <div class="stat-info">
+                            <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">Classes Attended</span>
+                            <h2 id="stat-attended-classes" style="font-size: 28px; font-weight: 800; margin-top: 4px;">0</h2>
+                        </div>
+                        <div class="stat-icon attended" style="background: rgba(99, 102, 241, 0.15); color: var(--accent-primary);">
+                            <i class="fa-solid fa-check-double"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Attendance Activity -->
+                <div class="glass-panel">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="font-size: 16px; font-weight: 800; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-clock-rotate-left" style="color: var(--accent-primary);"></i>
+                            Recent Attendance Activity Log
+                        </h3>
+                        <button class="btn btn-secondary" onclick="switchView('history-view')" style="padding: 4px 12px; font-size: 11.5px; font-weight: 700;">
+                            View Full Log <i class="fa-solid fa-arrow-right" style="margin-left: 4px;"></i>
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Subject</th>
+                                    <th>Faculty Member</th>
+                                    <th>Scanned Date & Time</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-attendance-tbody">
+                                <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 24px;">Loading recent activity...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MODULE 2: QR SCANNER VIEW -->
+            <section class="view-section" id="scan-view">
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <h3>Scan Live Attendance QR Code</h3>
+                    </div>
+
+                    <div id="qr-reader-container" style="max-width: 480px; margin: 0 auto;">
+                        <div id="qr-reader" style="border-radius: var(--radius-md); overflow: hidden;"></div>
+
+                        <div id="scan-feedback-message" style="margin-top: 18px; font-size: 14px; font-weight: 600; text-align: center; color: var(--text-secondary);">
+                            Point your camera at the teacher's projected QR code.
+                        </div>
+
+                        <div style="display: flex; gap: 12px; margin-top: 20px; justify-content: center;">
+                            <button class="btn btn-primary" id="start-scan-btn">
+                                <i class="fa-solid fa-camera"></i> Start Camera Scan
+                            </button>
+                            <button class="btn btn-secondary" id="stop-scan-btn">
+                                <i class="fa-solid fa-video-slash"></i> Stop Camera
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MODULE 2: ATTENDANCE & ANALYTICS VIEW -->
+            <section class="view-section" id="history-view">
+                <!-- Progress & Percentage Summary -->
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <h3>Attendance Analytics & Summary</h3>
+                    </div>
+                    <div id="analytics-progress-container" style="margin-bottom: 16px;">
+                        <div style="display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 8px;">
+                            <span>Overall Attendance Target (75% Minimum Required)</span>
+                            <span id="analytics-percentage-text">0%</span>
+                        </div>
+                        <div style="width: 100%; height: 12px; background: rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden;">
+                            <div id="analytics-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #10b981, #06b6d4); transition: width 0.6s ease;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Subject-Wise Attendance Breakdown Table -->
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <h3>Subject-Wise Attendance Breakdown</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Subject Name</th>
+                                    <th>Code</th>
+                                    <th>Type</th>
+                                    <th>Attended / Total</th>
+                                    <th>Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody id="subject-attendance-tbody">
+                                <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Loading breakdown...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Complete Logs Table -->
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <h3>Attendance Session History</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Subject</th>
+                                    <th>Faculty Member</th>
+                                    <th>Scanned Date & Time</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="full-history-tbody">
+                                <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Loading history...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MODULE 4: LEAVES & ALERTS VIEW -->
+            <section class="view-section" id="leaves-alerts-view">
+                <!-- Header Banner -->
+                <div class="glass-panel" style="margin-bottom: 20px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(168, 85, 247, 0.08)); border: 1px solid rgba(99, 102, 241, 0.25);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <h2 style="font-size: 20px; font-weight: 800; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 10px;">
+                                <i class="fa-solid fa-plane-departure" style="color: var(--accent-emerald);"></i>
+                                Student Absence & Leave Management
+                            </h2>
+                            <p style="font-size: 13px; color: var(--text-secondary); margin: 0;">Submit formal absence requests, track approval workflows, and receive official notices.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Metrics Cards -->
+                <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 24px;">
+                    <div class="stat-card" style="border-top: 3px solid var(--accent-emerald);">
+                        <div class="stat-info">
+                            <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">Total Applications</span>
+                            <h2 id="leave-stat-total" style="font-size: 28px; font-weight: 800; margin-top: 4px;">0</h2>
+                        </div>
+                        <div class="stat-icon total">
+                            <i class="fa-solid fa-file-signature"></i>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-top: 3px solid var(--accent-emerald);">
+                        <div class="stat-info">
+                            <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">Approved Leaves</span>
+                            <h2 id="leave-stat-approved" style="font-size: 28px; font-weight: 800; color: var(--accent-emerald); margin-top: 4px;">0</h2>
+                        </div>
+                        <div class="stat-icon attended" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald);">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-top: 3px solid #f59e0b;">
+                        <div class="stat-info">
+                            <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">Pending Review</span>
+                            <h2 id="leave-stat-pending" style="font-size: 28px; font-weight: 800; color: #f59e0b; margin-top: 4px;">0</h2>
+                        </div>
+                        <div class="stat-icon total" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">
+                            <i class="fa-solid fa-hourglass-half"></i>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-top: 3px solid #6366f1;">
+                        <div class="stat-info">
+                            <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">System Alerts</span>
+                            <h2 id="leave-stat-alerts" style="font-size: 28px; font-weight: 800; color: #6366f1; margin-top: 4px;">0</h2>
+                        </div>
+                        <div class="stat-icon percentage" style="background: rgba(99, 102, 241, 0.15); color: #6366f1;">
+                            <i class="fa-solid fa-bell"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-grid" style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; margin-bottom: 24px;">
+                    <!-- Leave Application Form -->
+                    <div class="glass-panel" style="padding: 24px; border: 1px solid var(--glass-border); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.12);">
+                        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 14px; margin-bottom: 18px;">
+                            <div>
+                                <h3 style="font-size: 16px; font-weight: 800; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fa-solid fa-paper-plane" style="color: var(--accent-emerald);"></i> 
+                                    Apply for Absence Leave
+                                </h3>
+                                <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Fill out the details below to request formal absence authorization.</p>
+                            </div>
+                            <span id="leave-duration-badge" style="font-size: 11.5px; font-weight: 800; background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 182, 212, 0.2)); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3); padding: 4px 12px; border-radius: 14px; display: none; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);">0 Days</span>
+                        </div>
+                        
+                        <form id="apply-leave-form" style="display: flex; flex-direction: column; gap: 16px;">
+                            <!-- Category Select -->
+                            <div class="form-group">
+                                <label for="leave-type" style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-layer-group" style="color: var(--accent-emerald);"></i> Leave Category / Type *
+                                </label>
+                                <select id="leave-type" class="form-control" required style="width: 100%; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary); padding: 11px 14px; border-radius: var(--radius-md); font-size: 13px; font-weight: 600;">
+                                    <option value="Medical Leave">🏥 Medical Leave (Sick Leave / Health Emergency)</option>
+                                    <option value="Casual Leave" selected>🌴 Casual / Personal Leave</option>
+                                    <option value="Official Duty">💼 Official Duty / Academic Competition</option>
+                                    <option value="Family Emergency">🚨 Family Emergency / Urgent Affair</option>
+                                </select>
+                            </div>
+
+                            <!-- Start Date & End Date Row -->
+                            <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                                <div class="form-group">
+                                    <label for="leave-start-date" style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                                        <i class="fa-solid fa-calendar-day" style="color: var(--accent-cyan);"></i> Start Date *
+                                    </label>
+                                    <input type="date" id="leave-start-date" class="form-control" required style="width: 100%; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary); padding: 11px 14px; border-radius: var(--radius-md); font-size: 13px; font-weight: 600;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="leave-end-date" style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                                        <i class="fa-solid fa-calendar-check" style="color: var(--accent-emerald);"></i> End Date *
+                                    </label>
+                                    <input type="date" id="leave-end-date" class="form-control" required style="width: 100%; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary); padding: 11px 14px; border-radius: var(--radius-md); font-size: 13px; font-weight: 600;">
+                                </div>
+                            </div>
+
+                            <!-- Reason Textarea -->
+                            <div class="form-group">
+                                <label for="leave-reason" style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-pen-to-square" style="color: var(--accent-rose);"></i> Detailed Reason for Leave *
+                                </label>
+                                <textarea id="leave-reason" class="form-control" rows="3" placeholder="Please describe the detailed reason for your absence..." required style="width: 100%; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary); padding: 12px 14px; border-radius: var(--radius-md); font-family: inherit; font-size: 13px; resize: vertical;"></textarea>
+                            </div>
+
+                            <!-- Submit Button -->
+                            <button type="submit" class="btn btn-primary" id="leave-submit-btn" style="width: 100%; padding: 13px; font-size: 14px; font-weight: 800; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; border: none; border-radius: var(--radius-md); box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4); cursor: pointer; transition: all 0.3s ease;">
+                                <i class="fa-solid fa-paper-plane" style="margin-right: 8px;"></i> Submit Leave Application
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- System Alerts & Notifications Drawer -->
+                    <div class="glass-panel" style="padding: 24px; border: 1px solid var(--glass-border);">
+                        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 14px; margin-bottom: 18px;">
+                            <h3 style="font-size: 16px; font-weight: 800; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-bell" style="color: #6366f1;"></i> Notifications & System Alerts
+                            </h3>
+                            <button class="btn btn-secondary" style="font-size: 11px; padding: 5px 12px; font-weight: 700; border-radius: 12px;" onclick="markAllNotificationsRead()">
+                                <i class="fa-solid fa-check-double" style="margin-right: 4px;"></i> Mark All Read
+                            </button>
+                        </div>
+                        <div id="notifications-list" style="display: flex; flex-direction: column; gap: 12px; max-height: 380px; overflow-y: auto; padding-right: 4px;">
+                            <div style="text-align: center; color: var(--text-muted); padding: 24px;">Loading notifications...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Leave Application History Table -->
+                <div class="glass-panel" style="padding: 24px; border: 1px solid var(--glass-border);">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+                        <h3 style="font-size: 16px; font-weight: 800; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-clock-rotate-left" style="color: var(--accent-cyan);"></i> Leave Request Records & History
+                        </h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Duration / Dates</th>
+                                    <th>Days</th>
+                                    <th>Reason & Category</th>
+                                    <th>Status</th>
+                                    <th>Admin Remark</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leave-history-tbody">
+                                <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">Loading leave records...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MODULE 3: PROFILE VIEW -->
+            <section class="view-section" id="profile-view">
+                <!-- Hero Profile Card -->
+                <div class="glass-panel" style="margin-bottom: 20px; background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(16, 185, 129, 0.2) 100%); border: 1px solid rgba(16, 185, 129, 0.3);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
+                        <div style="display: flex; align-items: center; gap: 20px;">
+                            <div style="position: relative;">
+                                <img id="profile-img-preview" src="https://ui-avatars.com/api/?name=Student&background=10b981&color=fff" style="width: 88px; height: 88px; border-radius: 50%; object-fit: cover; border: 3px solid var(--accent-emerald); box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);">
+                                <label for="profile-pic-input" style="position: absolute; bottom: 2px; right: 2px; background: var(--accent-emerald); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);" title="Change Profile Picture">
+                                    <i class="fa-solid fa-camera"></i>
+                                </label>
+                            </div>
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                    <h2 id="prof-name" style="font-size: 22px; font-weight: 800; color: #f8fafc;">Student Name</h2>
+                                    <span style="background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3); padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                                        <i class="fa-solid fa-circle-check"></i> Verified Student
+                                    </span>
+                                </div>
+                                <p id="prof-enrollment" style="font-size: 13.5px; color: var(--text-secondary); margin-top: 4px;"></p>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass-border); padding: 10px 16px; border-radius: 14px; text-align: center;">
+                                <span style="font-size: 11px; color: var(--text-muted); display: block;">Status</span>
+                                <strong style="color: var(--accent-emerald); font-size: 13px;">Active Student</strong>
+                            </div>
+                            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass-border); padding: 10px 16px; border-radius: 14px; text-align: center;">
+                                <span style="font-size: 11px; color: var(--text-muted); display: block;">Current Section</span>
+                                <strong id="prof-header-section" style="color: var(--accent-cyan); font-size: 13px;">-</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Academic Info & Account Settings Grid -->
+                <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <!-- Academic Details Grid -->
+                    <div class="glass-panel">
+                        <div class="panel-header">
+                            <h3><i class="fa-solid fa-graduation-cap" style="color: var(--accent-emerald); margin-right: 8px;"></i> Academic Credentials</h3>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                            <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--glass-border); padding: 14px; border-radius: 14px;">
+                                <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;"><i class="fa-solid fa-envelope" style="color: #6366f1;"></i> Student Email</div>
+                                <strong id="prof-email" style="font-size: 13px; word-break: break-all;">-</strong>
+                            </div>
+
+                            <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--glass-border); padding: 14px; border-radius: 14px;">
+                                <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;"><i class="fa-solid fa-hashtag" style="color: var(--accent-cyan);"></i> Roll Number</div>
+                                <strong id="prof-roll" style="font-size: 13px;">-</strong>
+                            </div>
+
+                            <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--glass-border); padding: 14px; border-radius: 14px;">
+                                <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;"><i class="fa-solid fa-building-columns" style="color: #f59e0b;"></i> Department</div>
+                                <strong id="prof-dept" style="font-size: 13px;">-</strong>
+                            </div>
+
+                            <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--glass-border); padding: 14px; border-radius: 14px;">
+                                <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;"><i class="fa-solid fa-book-open" style="color: var(--accent-emerald);"></i> Course & Semester</div>
+                                <strong id="prof-course" style="font-size: 13px;">-</strong>
+                            </div>
+
+                            <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--glass-border); padding: 14px; border-radius: 14px;">
+                                <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;"><i class="fa-solid fa-users" style="color: #a855f7;"></i> Section</div>
+                                <strong id="prof-section" style="font-size: 13px;">-</strong>
+                            </div>
+
+                            <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--glass-border); padding: 14px; border-radius: 14px;">
+                                <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;"><i class="fa-solid fa-phone" style="color: #10b981;"></i> Phone Number</div>
+                                <strong id="prof-phone" style="font-size: 13px;">-</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Profile Photo & Security Settings -->
+                    <div style="display: flex; flex-direction: column; gap: 20px;">
+                        <!-- Profile Pic Form Card -->
+                        <div class="glass-panel">
+                            <div class="panel-header">
+                                <h3><i class="fa-solid fa-image" style="color: var(--accent-cyan); margin-right: 8px;"></i> Profile Photo Uploader</h3>
+                            </div>
+                            <form id="profile-pic-form" style="display: flex; flex-direction: column; gap: 12px;">
+                                <div class="form-group">
+                                    <label for="profile-pic-input" style="font-size: 12px; font-weight: 700; color: var(--text-secondary);">Select JPG, PNG or WEBP (Max 5MB)</label>
+                                    <input type="file" id="profile-pic-input" accept="image/*" class="form-control" required style="background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary); padding: 10px; border-radius: var(--radius-md); font-size: 13px;">
+                                </div>
+                                <button type="submit" class="btn btn-secondary" id="pic-upload-btn" style="width: 100%; padding: 10px; font-weight: 700;">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i> Upload & Save Picture
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Change Password Form Card -->
+                        <div class="glass-panel">
+                            <div class="panel-header">
+                                <h3><i class="fa-solid fa-shield-halved" style="color: #6366f1; margin-right: 8px;"></i> Security & Password</h3>
+                            </div>
+                            <form id="change-password-form" style="display: flex; flex-direction: column; gap: 12px;">
+                                <div class="form-group">
+                                    <label for="curr-pass" style="font-size: 12px; font-weight: 700; color: var(--text-secondary);"><i class="fa-solid fa-lock"></i> Current Password *</label>
+                                    <div style="position: relative; display: flex; align-items: center;">
+                                        <input type="password" id="curr-pass" class="form-control" placeholder="••••••••" required style="width: 100%; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary); padding: 10px 40px 10px 14px; border-radius: var(--radius-md);">
+                                        <i class="fa-solid fa-eye" id="toggleCurrPass" style="position: absolute; right: 14px; color: var(--text-muted); cursor: pointer; font-size: 13px;"></i>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="new-pass" style="font-size: 12px; font-weight: 700; color: var(--text-secondary);"><i class="fa-solid fa-key"></i> New Password *</label>
+                                    <div style="position: relative; display: flex; align-items: center;">
+                                        <input type="password" id="new-pass" class="form-control" placeholder="••••••••" required style="width: 100%; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary); padding: 10px 40px 10px 14px; border-radius: var(--radius-md);">
+                                        <i class="fa-solid fa-eye" id="toggleNewPass" style="position: absolute; right: 14px; color: var(--text-muted); cursor: pointer; font-size: 13px;"></i>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary" id="pass-submit-btn" style="width: 100%; padding: 11px; font-weight: 700; margin-top: 4px;">
+                                    <i class="fa-solid fa-lock"></i> Update Password
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MODULE 5: REPORTS & EXPORTS VIEW -->
+            <section class="view-section" id="reports-view">
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <h3>Attendance Reports & Export Engine</h3>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn btn-primary" onclick="exportAttendancePDF()">
+                                <i class="fa-solid fa-file-pdf"></i> Download PDF Report
+                            </button>
+                            <button class="btn btn-secondary" onclick="printAttendanceReport()">
+                                <i class="fa-solid fa-print"></i> Print Report
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 180px;">
+                            <label style="font-size: 12px; font-weight: 700; color: var(--text-secondary);">Filter by Subject</label>
+                            <select id="report-subject-filter" class="form-control" style="margin-top: 4px;" onchange="loadReportData()">
+                                <option value="">All Subjects</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive" id="printable-report-area">
+                        <table class="data-table" id="report-table">
+                            <thead>
+                                <tr>
+                                    <th>Subject</th>
+                                    <th>Code</th>
+                                    <th>Faculty Member</th>
+                                    <th>Scanned Date & Time</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-tbody">
+                                <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Loading report data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MODULE 6: STUDY MATERIALS VIEW -->
+            <section class="view-section" id="materials-view">
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <h3><i class="fa-solid fa-folder-open" style="color: var(--accent-primary); margin-right: 8px;"></i> Course Study Materials & Notes</h3>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Material Title</th>
+                                    <th>Subject</th>
+                                    <th>Faculty Member</th>
+                                    <th>Upload Date</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="student-materials-tbody">
+                                <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">Loading course materials...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- System Notification Modal -->
+    <div class="modal-overlay" id="systemNotificationModal" style="display: none;">
+        <div class="modal-container" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3 style="display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 800;">
+                    <i class="fa-solid fa-bell" style="color: var(--accent-teal);"></i> System Notifications & Alerts
+                </h3>
+                <button type="button" class="action-btn" onclick="toggleSystemNotificationModal()" style="font-size: 18px; color: var(--text-muted);">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="systemNotifModalBody" style="display: flex; flex-direction: column; gap: 12px; max-height: 380px; overflow-y: auto;">
+                <div style="text-align: center; color: var(--text-muted); padding: 24px;">Loading notifications...</div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <button type="button" class="btn btn-secondary" onclick="markAllNotificationsRead()" style="font-size: 12px; padding: 6px 12px;">Mark All as Read</button>
+                <button type="button" class="btn btn-primary" onclick="toggleSystemNotificationModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- Shared UI Utilities Script (Toast, Modals, Loader) -->
+    <script src="../shared/utils.js"></script>
+    <!-- Shared System Notifications Poller Script -->
+    <script src="../shared/notifications.js"></script>
+    <!-- QR Scanner Validation Module -->
+    <script src="scanner.js"></script>
+    <!-- Student Dashboard Logic -->
+    <script src="student.js"></script>
+</body>
+</html>

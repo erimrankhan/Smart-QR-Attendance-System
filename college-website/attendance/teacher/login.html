@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Portal Login | Smart QR Attendance System</title>
+    <!-- Google Fonts & Font Awesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Global & Dashboard CSS -->
+    <link rel="stylesheet" href="../shared/styles.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            width: 100%;
+            padding: 24px 16px;
+            background: radial-gradient(circle at 15% 15%, #042f2e 0%, #0f172a 50%, #020617 100%);
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Animated Glowing Ambient Blobs */
+        .ambient-blob {
+            position: absolute;
+            width: 350px;
+            height: 350px;
+            background: radial-gradient(circle, rgba(13, 148, 136, 0.3) 0%, rgba(2, 132, 199, 0) 70%);
+            border-radius: 50%;
+            filter: blur(40px);
+            z-index: 0;
+            pointer-events: none;
+            animation: floatBlob 8s infinite alternate ease-in-out;
+        }
+        .ambient-blob-2 {
+            bottom: -50px;
+            right: -50px;
+            width: 380px;
+            height: 380px;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, rgba(13, 148, 136, 0) 70%);
+            animation-delay: -4s;
+        }
+
+        @keyframes floatBlob {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(30px, 30px) scale(1.1); }
+        }
+
+        .login-card {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 440px;
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(28px);
+            -webkit-backdrop-filter: blur(28px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: var(--radius-lg);
+            padding: 40px 32px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 30px rgba(13, 148, 136, 0.15);
+            margin: auto;
+            animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+        .login-header .logo {
+            width: 64px;
+            height: 64px;
+            background: var(--accent-gradient);
+            border-radius: var(--radius-md);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 30px;
+            margin-bottom: 16px;
+            box-shadow: 0 8px 24px rgba(13, 148, 136, 0.45);
+        }
+        .login-header h2 {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--text-primary);
+            letter-spacing: -0.5px;
+        }
+        .login-header p {
+            font-size: 13.5px;
+            color: var(--text-secondary);
+            margin-top: 6px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .input-wrapper .form-control {
+            width: 100%;
+            padding: 13px 44px 13px 16px;
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all var(--transition-fast);
+        }
+        .input-wrapper .form-control:focus {
+            outline: none;
+            border-color: var(--accent-teal);
+            box-shadow: 0 0 0 3.5px rgba(13, 148, 136, 0.2);
+        }
+        .toggle-password-btn {
+            position: absolute;
+            right: 14px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 16px;
+            transition: color var(--transition-fast);
+        }
+        .toggle-password-btn:hover {
+            color: var(--accent-teal);
+        }
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 32px 24px;
+                border-radius: 16px;
+            }
+            .login-header .logo {
+                width: 54px;
+                height: 54px;
+                font-size: 26px;
+            }
+            .login-header h2 {
+                font-size: 21px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-blob"></div>
+    <div class="ambient-blob ambient-blob-2"></div>
+
+    <div class="login-card">
+        <!-- Return Portal Directory Button -->
+     <!--   <a href="../index.html" style="position: absolute; top: 20px; left: 20px; color: var(--text-muted); text-decoration: none; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; transition: color 0.2s ease;">
+            <i class="fa-solid fa-arrow-left"></i> Back to Portals
+        </a>  -->
+
+        <div class="login-header" style="margin-top: 10px;">
+            <div class="logo">
+                <i class="fa-solid fa-chalkboard-user"></i>
+            </div>
+            <h2>Faculty Portal</h2>
+            <p>Smart QR Attendance System</p>
+        </div>
+
+        <form id="teacher-login-form">
+            <div class="form-group" style="margin-bottom: 18px;">
+                <label for="employee_id">Employee ID or Email</label>
+                <div class="input-wrapper">
+                    <input type="text" id="employee_id" class="form-control" placeholder="EMP-1001 or teacher@college.edu" required>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 24px;">
+                <label for="password">Password</label>
+                <div class="input-wrapper">
+                    <input type="password" id="password" class="form-control" placeholder="••••••••" required>
+                    <button type="button" class="toggle-password-btn" onclick="toggleTeacherPasswordVisibility()" title="Toggle Password Visibility">
+                        <i class="fa-solid fa-eye" id="togglePasswordIcon"></i>
+                    </button>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 14px; font-size: 14px; font-weight: 800;">
+                <i class="fa-solid fa-right-to-bracket"></i> Sign In to Faculty Portal
+            </button>
+        </form>
+        <div style="text-align: center; margin-top: 24px; font-size: 13px; color: var(--text-secondary); border-top: 1px dashed var(--glass-border); padding-top: 18px;">
+            New Faculty Member? <a href="register.html" style="color: var(--accent-teal); font-weight: 800; text-decoration: none;">Register Here</a>
+        </div>
+    </div>
+
+    <!-- Global Utilities -->
+    <script src="../shared/utils.js"></script>
+    <script>
+        function toggleTeacherPasswordVisibility() {
+            const passInput = document.getElementById('password');
+            const toggleIcon = document.getElementById('togglePasswordIcon');
+            if (!passInput || !toggleIcon) return;
+
+            if (passInput.type === 'password') {
+                passInput.type = 'text';
+                toggleIcon.classList.remove('fa-eye');
+                toggleIcon.classList.add('fa-eye-slash');
+            } else {
+                passInput.type = 'password';
+                toggleIcon.classList.remove('fa-eye-slash');
+                toggleIcon.classList.add('fa-eye');
+            }
+        }
+
+        document.getElementById('teacher-login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const employee_id = document.getElementById('employee_id').value;
+            const password = document.getElementById('password').value;
+
+            showLoading('Authenticating Teacher credentials...');
+
+            try {
+                const HOST_IP = (window.location.hostname && window.location.hostname !== '') ? window.location.hostname : 'localhost';
+                const response = await fetch(`http://${HOST_IP}:5000/api/auth/teacher/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ employee_id, password })
+                });
+
+                const data = await response.json();
+                hideLoading();
+
+                if (response.ok && data.status === 'success') {
+                    localStorage.setItem('teacherToken', data.token);
+                    localStorage.setItem('teacherUser', JSON.stringify(data.user));
+                    sessionStorage.setItem('justLoggedIn', 'true');
+
+                    showToast('Authentication successful! Redirecting to Teacher Dashboard...');
+                    setTimeout(() => {
+                        window.location.href = 'dashboard.html';
+                    }, 600);
+                } else {
+                    showToast(data.message || 'Invalid credentials or inactive account.', 'error');
+                }
+            } catch (err) {
+                hideLoading();
+                showToast('Unable to connect to backend server.', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

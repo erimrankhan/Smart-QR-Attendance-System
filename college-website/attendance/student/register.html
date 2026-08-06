@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Registration | Smart QR Attendance System</title>
+    <!-- Google Fonts & Font Awesome Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Shared & Dashboard CSS -->
+    <link rel="stylesheet" href="../shared/styles.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 16px;
+            background: #090d16;
+            position: relative;
+            overflow-x: hidden;
+            color: #f8fafc;
+        }
+
+        /* Ambient Glowing Background Orbs */
+        .ambient-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(90px);
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.55;
+            animation: orbFloat 10s ease-in-out infinite alternate;
+        }
+
+        .orb-1 {
+            width: 380px;
+            height: 380px;
+            background: radial-gradient(circle, #6366f1 0%, rgba(99, 102, 241, 0) 70%);
+            top: -100px;
+            left: -80px;
+        }
+
+        .orb-2 {
+            width: 420px;
+            height: 420px;
+            background: radial-gradient(circle, #06b6d4 0%, rgba(6, 182, 212, 0) 70%);
+            bottom: -120px;
+            right: -90px;
+            animation-delay: -5s;
+        }
+
+        @keyframes orbFloat {
+            from {
+                transform: translate(0, 0) scale(1);
+            }
+
+            to {
+                transform: translate(30px, 40px) scale(1.1);
+            }
+        }
+
+        /* Glassmorphism Register Card */
+        .register-card {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 520px;
+            background: rgba(15, 23, 42, 0.72);
+            backdrop-filter: blur(28px);
+            -webkit-backdrop-filter: blur(28px);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 24px;
+            padding: 40px 36px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+            animation: cardAppear 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes cardAppear {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.97);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* Card Header */
+        .register-header {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+
+        .brand-icon-wrapper {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
+            border-radius: 18px;
+            color: white;
+            font-size: 28px;
+            margin-bottom: 16px;
+            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.45);
+        }
+
+        .register-header h2 {
+            font-size: 25px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .register-header p {
+            font-size: 13.5px;
+            color: #94a3b8;
+            margin-top: 6px;
+        }
+
+        /* Workflow Status Pill Badge */
+        .approval-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            color: #818cf8;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 22px;
+        }
+
+        /* Form Grid Layout */
+        .form-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #cbd5e1;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Input Icon Wrappers */
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-wrapper i.input-icon {
+            position: absolute;
+            left: 14px;
+            color: #64748b;
+            font-size: 15px;
+            transition: color 0.2s ease;
+            pointer-events: none;
+        }
+
+        .form-control-custom {
+            width: 100%;
+            padding: 13px 16px 13px 42px;
+            background: rgba(15, 23, 42, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 12px;
+            color: #f8fafc;
+            font-size: 13.5px;
+            font-weight: 500;
+            font-family: inherit;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .form-control-custom option {
+            background: #0f172a;
+            color: #f8fafc;
+        }
+
+        .form-control-custom::placeholder {
+            color: #64748b;
+        }
+
+        .form-control-custom:focus {
+            outline: none;
+            background: rgba(15, 23, 42, 0.85);
+            border-color: #6366f1;
+            box-shadow: 0 0 18px rgba(99, 102, 241, 0.35);
+        }
+
+        .input-wrapper:focus-within i.input-icon {
+            color: #818cf8;
+        }
+
+        /* Password Show Toggle */
+        .toggle-password {
+            position: absolute;
+            right: 14px;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px;
+            transition: color 0.2s ease;
+        }
+
+        .toggle-password:hover {
+            color: #f8fafc;
+        }
+
+        /* Submit Button */
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+            border: none;
+            border-radius: 14px;
+            color: white;
+            font-size: 14.5px;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-top: 8px;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(99, 102, 241, 0.55);
+            background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
+        }
+
+        .btn-submit:active {
+            transform: translateY(0);
+        }
+
+        .btn-submit:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Footer Link */
+        .register-footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 13px;
+            color: #94a3b8;
+        }
+
+        .register-footer a {
+            color: #818cf8;
+            font-weight: 700;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .register-footer a:hover {
+            color: #a5b4fc;
+            text-decoration: underline;
+        }
+
+        @media (max-width: 520px) {
+            .register-card {
+                padding: 30px 22px;
+                border-radius: 18px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+                gap: 18px;
+            }
+
+            .register-header h2 {
+                font-size: 22px;
+            }
+        }
+        /* Dropdown ki styling ko baki dark theme jaisa banane ke liye */
+#courseSelect {
+    width: 100%;
+    background-color: transparent; /* Background ko dark/transparent karta hai */
+    color: #94a3b8; /* Text ka color light gray/white karega */
+    border: 1px solid #334155; /* Baki inputs jaisa border color */
+    border-radius: 8px; /* Rounded corners */
+    padding: 12px 12px 12px 40px; /* IMPORTANT: Left me 40px jagah banayega taaki icon overlap na kare */
+    appearance: none; /* Browser ki default white styling ko hatata hai */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    outline: none;
+}
+
+/* Jab dropdown khulega, toh uski list bhi dark dikhegi */
+#courseSelect option {
+    background-color: #0f172a; /* Apne form ke background jaisa dark color yahan daalein */
+    color: #ffffff;
+}
+
+/* Focus hone par border highlight */
+#courseSelect:focus {
+    border-color: #3b82f6; /* Blue highlight */
+}
+    </style>
+</head>
+
+<body>
+
+    <!-- Ambient Glowing Background Orbs -->
+    <div class="ambient-orb orb-1"></div>
+    <div class="ambient-orb orb-2"></div>
+
+    <div class="register-card">
+        <div class="register-header">
+            <div class="brand-icon-wrapper">
+                <i class="fa-solid fa-user-graduate"></i>
+            </div>
+            <h2>Student Registration</h2>
+            <p>Smart QR Attendance System Enrollment</p>
+        </div>
+
+        <div style="text-align: center;">
+            <div class="approval-badge">
+                <i class="fa-solid fa-shield-halved"></i> Requires Admin Approval
+            </div>
+        </div>
+
+        <form id="student-register-form" class="form-grid">
+            <!-- Row 1: Enrollment No & Roll No -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="enrollment_no">Enrollment No. *</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-id-card input-icon"></i>
+                        <input type="text" id="enrollment_no" class="form-control-custom" placeholder="Enrollment Id"
+                            required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="roll_no">Roll Number</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-hashtag input-icon"></i>
+                        <input type="text" id="roll_no" class="form-control-custom" placeholder="Roll NO">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Full Name -->
+            <div class="form-group">
+                <label for="name">Full Name *</label>
+                <div class="input-wrapper">
+                    <i class="fa-solid fa-user input-icon"></i>
+                    <input type="text" id="name" class="form-control-custom" placeholder="Your Name" required>
+                </div>
+            </div>
+
+            <!-- Student Email -->
+            <div class="form-group">
+                <label for="email">Student Email *</label>
+                <div class="input-wrapper">
+                    <i class="fa-solid fa-envelope input-icon"></i>
+                    <input type="email" id="email" class="form-control-custom" placeholder="Your Email Address"
+                        required>
+                </div>
+            </div>
+
+            <!-- Course Select Dropdown -->
+            <div class="form-group">
+                <label for="courseSelect">Degree / Course Program *</label>
+                <div class="input-wrapper">
+                    <i class="fa-solid fa-book-bookmark input-icon"></i>
+                    <!-- HTML mein yeh aisa dikhna chahiye -->
+                     <!-- Agar Enrolled section mein class="form-input" hai, toh yahan bhi wahi lagayein -->
+<select id="courseSelect" class="form-input" required>
+    <option value="">Select Degree Program *</option>
+</select>
+                </div>
+            </div>
+
+            <!-- Section Select Dropdown -->
+            <div class="form-group">
+                <label for="sectionSelect">Enrolled Section (Optional)</label>
+                <div class="input-wrapper">
+                    <i class="fa-solid fa-graduation-cap input-icon"></i>
+                    <select id="sectionSelect" class="form-control-custom">
+                        <option value="">Loading sections...</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Row 2: Password & Phone -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="password">Password *</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-lock input-icon"></i>
+                        <input type="password" id="password" class="form-control-custom" placeholder="••••••••"
+                            required>
+                        <i class="fa-solid fa-eye toggle-password" id="togglePassword"></i>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Phone Number</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-phone input-icon"></i>
+                        <input type="tel" id="phone" class="form-control-custom" placeholder="+91 9876543210">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="btn-submit" id="submit-btn">
+                <i class="fa-solid fa-paper-plane"></i>
+                <span>Submit Student Registration</span>
+            </button>
+        </form>
+
+        <div class="register-footer">
+            Already registered?
+            <a href="login.html">Sign in to Student Portal</a>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container & Script -->
+    <div id="toast-container"></div>
+    <script src="../shared/utils.js"></script>
+
+    <script>
+        const HOST_IP = (window.location.hostname && window.location.hostname !== '') ? window.location.hostname : 'localhost';
+        const API_BASE_URL = `http://${HOST_IP}:5000/api`;
+
+        // Password Show/Hide Toggle
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('password');
+
+        if (togglePassword && passwordInput) {
+            togglePassword.addEventListener('click', () => {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                togglePassword.className = type === 'password' ? 'fa-solid fa-eye toggle-password' : 'fa-solid fa-eye-slash toggle-password';
+            });
+        }
+
+        // Load Public Dropdowns on Page Load
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchPublicCourses();
+            fetchPublicSections();
+        });
+
+        async function fetchPublicCourses() {
+            const courseDropdown = document.getElementById('courseSelect');
+            if (!courseDropdown) return;
+
+            try {
+                courseDropdown.innerHTML = '<option value="">Loading courses...</option>';
+                
+                const response = await fetch(`${API_BASE_URL}/public/courses`); 
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const resData = await response.json();
+                
+                if (resData.status === 'success' && resData.data && resData.data.length > 0) {
+                    courseDropdown.innerHTML = '<option value="">Select Degree Program *</option>';
+                    resData.data.forEach(course => {
+                        const option = document.createElement('option');
+                        option.value = course.id;
+                        option.textContent = `${course.name} (${course.code})`;
+                        courseDropdown.appendChild(option);
+                    });
+                } else {
+                    courseDropdown.innerHTML = '<option value="">No courses available</option>';
+                }
+            } catch (error) {
+                console.error('Error fetching courses:', error);
+                courseDropdown.innerHTML = '<option value="">Failed to load courses</option>';
+                if (typeof showToast === 'function') {
+                    showToast('Unable to load courses. Please try again later.', 'error');
+                }
+            }
+        }
+
+        async function fetchPublicSections() {
+            const selectEl = document.getElementById('sectionSelect');
+            if (!selectEl) return;
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/public-sections`);
+                const resData = await response.json();
+
+                if (response.ok && resData.status === 'success') {
+                    const sections = resData.data;
+                    if (sections.length === 0) {
+                        selectEl.innerHTML = `<option value="">No active sections available</option>`;
+                    } else {
+                        selectEl.innerHTML = `<option value="">Select Enrolled Section (Optional)</option>` +
+                            sections.map(s => `
+                                <option value="${s.id}">
+                                    Section ${s.section_name} ${s.course_name ? `(${s.course_name} - Sem ${s.semester_number || 1})` : ''}
+                                </option>
+                            `).join('');
+                    }
+                } else {
+                    selectEl.innerHTML = `<option value="">Failed to load sections</option>`;
+                }
+            } catch (err) {
+                selectEl.innerHTML = `<option value="">Error connecting to server</option>`;
+            }
+        }
+
+        // Form Submit Handler
+        document.getElementById('student-register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitBtn = document.getElementById('submit-btn');
+            const courseVal = document.getElementById('courseSelect').value;
+            const secVal = document.getElementById('sectionSelect').value;
+
+            if (!courseVal) {
+                if (typeof showToast === 'function') showToast('Please select a Course.', 'error');
+                else alert('Please select a Course.');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Submitting...`;
+
+            const payload = {
+                enrollment_no: document.getElementById('enrollment_no').value.trim(),
+                roll_no: document.getElementById('roll_no').value.trim() || null,
+                name: document.getElementById('name').value.trim(),
+                email: document.getElementById('email').value.trim(),
+                password: document.getElementById('password').value,
+                phone: document.getElementById('phone').value.trim() || null,
+                course_id: parseInt(courseVal, 10),
+                section_id: secVal ? parseInt(secVal, 10) : null
+            };
+
+            console.log("Sending Student Registration payload:", payload);
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/student/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const resData = await response.json();
+
+                if (response.ok && resData.status === 'success') {
+                    if (typeof showToast === 'function') {
+                        showToast('Registration successful! Your account is pending Admin approval.');
+                    } else {
+                        alert('Registration successful! Your account is pending Admin approval.');
+                    }
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 1200);
+                } else {
+                    if (typeof showToast === 'function') {
+                        showToast(resData.message || 'Registration failed.', 'error');
+                    } else {
+                        alert(resData.message || 'Registration failed.');
+                    }
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Submit Student Registration</span>`;
+                }
+            } catch (err) {
+                if (typeof showToast === 'function') {
+                    showToast('Connection error during registration. Please try again.', 'error');
+                } else {
+                    alert('Connection error during registration. Please try again.');
+                }
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Submit Student Registration</span>`;
+            }
+        });
+    </script>
+</body>
+
+</html>

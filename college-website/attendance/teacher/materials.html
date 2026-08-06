@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Study Material Upload | Smart QR Attendance System</title>
+    <!-- Google Fonts & Font Awesome Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Global & Dashboard CSS -->
+    <link rel="stylesheet" href="../shared/styles.css">
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-logo">
+                    <i class="fa-solid fa-chalkboard-user"></i>
+                </div>
+                <div class="brand-text">
+                    <h2>Smart QR</h2>
+                    <p>Faculty Portal</p>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="dashboard.html" class="nav-item">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="materials.html" class="nav-item active">
+                    <i class="fa-solid fa-folder-open"></i>
+                    <span>Upload Study Materials</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="page-title">
+                    <h1>Upload Course-Specific Study Material</h1>
+                    <p>Share PPTs, PDFs, and notes targeted by Course, Semester, and Subject</p>
+                </div>
+            </header>
+
+            <section class="content-section" style="padding: 24px;">
+                <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                    <!-- Glassmorphism Form Card -->
+                    <div class="glass-panel" style="padding: 28px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px;">
+                        <div class="panel-header" style="margin-bottom: 20px;">
+                            <h3><i class="fa-solid fa-cloud-arrow-up" style="color: var(--accent-primary); margin-right: 8px;"></i> Upload Study Material</h3>
+                        </div>
+
+                        <form id="material-upload-form" style="display: flex; flex-direction: column; gap: 16px;">
+                            <!-- Note Title -->
+                            <div class="form-group">
+                                <label for="material-title" style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary);">Material / Note Title *</label>
+                                <input type="text" id="material-title" class="form-control" placeholder="e.g. Unit 3 Operating System Concepts (PPT)" required style="width: 100%; padding: 12px; border-radius: 8px;">
+                            </div>
+
+                            <!-- Cascading Dropdown 1: Course -->
+                            <div class="form-group">
+                                <label for="material-course-select" style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary);">Target Course *</label>
+                                <select id="material-course-select" class="form-control" required style="width: 100%; padding: 12px; border-radius: 8px;">
+                                    <option value="">Loading courses...</option>
+                                </select>
+                            </div>
+
+                            <!-- Cascading Dropdown 2: Semester -->
+                            <div class="form-group">
+                                <label for="material-semester-select" style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary);">Semester *</label>
+                                <select id="material-semester-select" class="form-control" required disabled style="width: 100%; padding: 12px; border-radius: 8px;">
+                                    <option value="">Select Course First</option>
+                                </select>
+                            </div>
+
+                            <!-- Cascading Dropdown 3: Subject -->
+                            <div class="form-group">
+                                <label for="material-subject-select" style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary);">Subject *</label>
+                                <select id="material-subject-select" class="form-control" required disabled style="width: 100%; padding: 12px; border-radius: 8px;">
+                                    <option value="">Select Semester First</option>
+                                </select>
+                            </div>
+
+                            <!-- File Upload Input -->
+                            <div class="form-group">
+                                <label for="material-file-input" style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary);">Document File (PDF, PPT, DOC - Max 50MB) *</label>
+                                <input type="file" id="material-file-input" accept=".pdf,.ppt,.pptx,.doc,.docx" class="form-control" required style="width: 100%; padding: 10px; border-radius: 8px;">
+                            </div>
+
+                            <!-- Submit Button -->
+                            <button type="submit" class="btn btn-primary" id="upload-submit-btn" style="width: 100%; padding: 14px; font-weight: 700; margin-top: 8px; border-radius: 8px; cursor: pointer;">
+                                <i class="fa-solid fa-paper-plane"></i> Upload & Share Material
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Material Information Panel -->
+                    <div class="glass-panel" style="padding: 28px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px;">
+                        <div class="panel-header" style="margin-bottom: 16px;">
+                            <h3><i class="fa-solid fa-circle-info" style="color: var(--accent-cyan); margin-right: 8px;"></i> Sharing Instructions</h3>
+                        </div>
+                        <ul style="line-height: 1.8; color: var(--text-muted); font-size: 13.5px; padding-left: 20px;">
+                            <li>Select the target <strong>Course</strong> (e.g. BCA, MCA) to filter semesters.</li>
+                            <li>Choose the relevant <strong>Semester</strong> to filter subjects assigned to that term.</li>
+                            <li>Select the specific <strong>Subject</strong> and attach your file (PDF, PPTX, or DOCX).</li>
+                            <li>Only students enrolled in the matching Course and Semester will view these materials in their student portal.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container"></div>
+
+    <script src="materials.js"></script>
+</body>
+</html>
