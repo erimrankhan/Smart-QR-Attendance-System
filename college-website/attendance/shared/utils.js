@@ -3,7 +3,7 @@
  */
 
 // 1. Apna Live Render Backend URL yahan paste karein:
-const PRODUCTION_BACKEND_URL = "https://smart-qr-attendance-system-8qzs.onrender.com/"; 
+const PRODUCTION_BACKEND_URL = "https://smart-qr-attendance-system-8qzs.onrender.com"; 
 
 // 2. Smart Environment Detection (Local vs Production)
 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
