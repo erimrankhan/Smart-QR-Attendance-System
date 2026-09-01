@@ -1,0 +1,5 @@
+/admin       /attendance/admin/login.html       302!
+/faculty     /attendance/teacher/login.html     302!
+/teacher     /attendance/teacher/login.html     302!
+/student     /attendance/student/login.html     302!
+/*           /index.html                        200

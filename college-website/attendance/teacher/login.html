@@ -157,11 +157,6 @@
     <div class="ambient-blob ambient-blob-2"></div>
 
     <div class="login-card">
-        <!-- Return Portal Directory Button -->
-     <!--   <a href="../index.html" style="position: absolute; top: 20px; left: 20px; color: var(--text-muted); text-decoration: none; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; transition: color 0.2s ease;">
-            <i class="fa-solid fa-arrow-left"></i> Back to Portals
-        </a>  -->
-
         <div class="login-header" style="margin-top: 10px;">
             <div class="logo">
                 <i class="fa-solid fa-chalkboard-user"></i>
@@ -198,6 +193,13 @@
     <!-- Global Utilities -->
     <script src="../shared/utils.js"></script>
     <script>
+        // Production Cloud Backend Configuration
+        const PRODUCTION_BACKEND_URL = "https://smart-qr-attendance-system-8qzs.onrender.com/"; // Apna actual Render backend URL yahan paste karein
+
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const BASE_SERVER_URL = window.API_BASE_URL || (isLocal ? `http://${window.location.hostname}:5000` : PRODUCTION_BACKEND_URL);
+        const AUTH_API = `${BASE_SERVER_URL}/api/auth`;
+
         function toggleTeacherPasswordVisibility() {
             const passInput = document.getElementById('password');
             const toggleIcon = document.getElementById('togglePasswordIcon');
@@ -216,14 +218,13 @@
 
         document.getElementById('teacher-login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const employee_id = document.getElementById('employee_id').value;
+            const employee_id = document.getElementById('employee_id').value.trim();
             const password = document.getElementById('password').value;
 
             showLoading('Authenticating Teacher credentials...');
 
             try {
-                const HOST_IP = (window.location.hostname && window.location.hostname !== '') ? window.location.hostname : 'localhost';
-                const response = await fetch(`http://${HOST_IP}:5000/api/auth/teacher/login`, {
+                const response = await fetch(`${AUTH_API}/teacher/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ employee_id, password })
@@ -246,7 +247,7 @@
                 }
             } catch (err) {
                 hideLoading();
-                showToast('Unable to connect to backend server.', 'error');
+                showToast('Unable to connect to backend server. Please verify your connection.', 'error');
             }
         });
     </script>

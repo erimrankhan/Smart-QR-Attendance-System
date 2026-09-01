@@ -18,15 +18,26 @@ const resourceRoutes = require('./src/routes/resourceRoutes');
 
 const app = express();
 
+// Cross-Origin Resource Policy disable taaki uploaded images/PDFs Netlify par easily access ho sakein
+app.use(helmet({
+    crossOriginResourcePolicy: false
+})); 
+
+// Universal CORS configuration for Netlify & Localhost access
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use(helmet()); 
-app.use(cors({ origin: true, credentials: true }));
 app.use(express.json()); 
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev')); 
 
+// Health Check Endpoint
 app.get('/', (req, res) => {
-    res.send('Smart QR Attendance Backend API Running');
+    res.status(200).json({ status: 'success', message: 'Smart QR Attendance Backend API Running' });
 });
 
 // Route Mounts
@@ -71,7 +82,7 @@ app.get('/api/public/sections/:course_id', async (req, res) => {
 // Global Error Handler
 app.use((err, req, res, next) => {
     console.error(err.stack);
-    res.status(500).json({ status: 'error', message: 'Internal Server Error' });
+    res.status(500).json({ status: 'error', message: err.message || 'Internal Server Error' });
 });
 
 const PORT = process.env.PORT || 5000;

@@ -506,7 +506,7 @@
                 <label for="name">Full Name *</label>
                 <div class="input-wrapper">
                     <i class="fa-solid fa-user input-icon"></i>
-                    <input type="text" id="name" class="form-control-custom" placeholder="IMRAN KHAN" required>
+                    <input type="text" id="name" class="form-control-custom" placeholder="Full Name" required>
                 </div>
             </div>
 
@@ -520,7 +520,7 @@
                 </div>
                 <div class="input-action-wrapper">
                     <i class="fa-solid fa-envelope input-icon"></i>
-                    <input type="email" id="email" class="form-control-custom" placeholder="imran.student@college.edu" required>
+                    <input type="email" id="email" class="form-control-custom" placeholder="student@college.edu" required>
                     <button type="button" id="sendOtpBtn" class="btn-otp-action">
                         <i class="fa-solid fa-paper-plane"></i> <span>Send OTP</span>
                     </button>
@@ -620,8 +620,13 @@
     <script src="../shared/utils.js"></script>
 
     <script>
-        const HOST_IP = (window.location.hostname && window.location.hostname !== '') ? window.location.hostname : 'localhost';
-        const API_BASE_URL = `http://${HOST_IP}:5000/api`;
+        // Production Cloud Backend Configuration
+        const PRODUCTION_BACKEND_URL = "https://smart-qr-attendance-system-8qzs.onrender.com/"; // Apna actual Render backend URL yahan paste karein
+
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const BASE_SERVER_URL = window.API_BASE_URL || (isLocal ? `http://${window.location.hostname}:5000` : PRODUCTION_BACKEND_URL);
+        const SERVER_URL = BASE_SERVER_URL;
+        const API_BASE_URL = `${SERVER_URL}/api`;
 
         // Password Show/Hide Toggle
         const togglePassword = document.getElementById('togglePassword');
@@ -634,8 +639,6 @@
                 togglePassword.className = type === 'password' ? 'fa-solid fa-eye toggle-password' : 'fa-solid fa-eye-slash toggle-password';
             });
         }
-
-        const SERVER_URL = `http://${HOST_IP}:5000`;
 
         let loadedCoursesCache = [];
 
@@ -650,12 +653,10 @@
         function determineMaxSemesters(course) {
             if (!course) return 8;
 
-            // 1. Explicit total_semesters property
             if (course.total_semesters && !isNaN(parseInt(course.total_semesters, 10))) {
                 return parseInt(course.total_semesters, 10);
             }
 
-            // 2. Direct calculation from duration_years (e.g. 2 yrs -> 4 sem, 3 yrs -> 6 sem, 4 yrs -> 8 sem)
             if (course.duration_years && !isNaN(parseInt(course.duration_years, 10))) {
                 const years = parseInt(course.duration_years, 10);
                 if (years >= 1 && years <= 6) {
@@ -663,28 +664,23 @@
                 }
             }
 
-            // 3. Pattern Matching by Course Name / Code
             const text = `${course.name || ''} ${course.code || ''}`.toUpperCase();
 
-            // 2 Years (4 Semesters): MCA, MBA, M.SC, M.TECH, MCOM, MA, Post Graduate
             if (/\b(MCA|MBA|M\.?SC|M\.?TECH|M\.?COM|M\.?A|M\.?PLAN|POST\s*GRADUATE|MASTER)\b/i.test(text)) {
                 return 4;
             }
 
-            // 3 Years (6 Semesters): BCA, BBA, B.SC, BCOM, BA, DIPLOMA, POLYTECHNIC
             if (/\b(BCA|BBA|B\.?SC|B\.?COM|B\.?A|DIPLOMA|POLYTECHNIC)\b/i.test(text)) {
                 return 6;
             }
 
-            // 4 Years (8 Semesters): B.TECH, BE, ENGINEERING, TECHNOLOGY, B.PHARM
             if (/\b(B\.?TECH|B\.?E|ENGINEERING|TECHNOLOGY|B\.?PHARM)\b/i.test(text)) {
                 return 8;
             }
 
-            return 8; // Default Fallback
+            return 8;
         }
 
-        // Load Courses on Page Load
         window.addEventListener('DOMContentLoaded', () => {
             loadCourses();
         });
@@ -714,12 +710,10 @@
             }
         }
 
-        // Handler: Dynamic Course Selection Change (Updates Valid Semesters & Sections)
         function handleCourseChange(courseId) {
             const semesterSelect = document.getElementById('semesterSelect');
             if (!semesterSelect) return;
 
-            // 1. If no course selected, reset and disable semester dropdown
             if (!courseId) {
                 semesterSelect.innerHTML = '<option value="">-- Select Degree / Course First --</option>';
                 semesterSelect.disabled = true;
@@ -728,11 +722,9 @@
                 return;
             }
 
-            // 2. Find selected course object from cache
             const selectedCourse = loadedCoursesCache.find(c => String(c.id) === String(courseId));
             const maxSemesters = determineMaxSemesters(selectedCourse);
 
-            // 3. Rebuild valid semester options dynamically
             let optionsHtml = '<option value="">Select Current Semester *</option>';
             for (let i = 1; i <= maxSemesters; i++) {
                 optionsHtml += `<option value="${i}">Semester ${i} (${getOrdinal(i)} Sem)</option>`;
@@ -740,9 +732,8 @@
 
             semesterSelect.innerHTML = optionsHtml;
             semesterSelect.disabled = false;
-            semesterSelect.value = ''; // Always reset semester on course switch to avoid invalid selection
+            semesterSelect.value = '';
 
-            // 4. Reload valid sections for the selected course
             loadSectionsForCourse(courseId);
         }
 
@@ -786,7 +777,6 @@
             }
         }
 
-        // Dynamic Course Selection Change Listener
         const courseSelectEl = document.getElementById('courseSelect');
         if (courseSelectEl) {
             courseSelectEl.addEventListener('change', (e) => {
@@ -794,7 +784,6 @@
             });
         }
 
-        // OTP Verification State & Controls
         let isEmailVerified = false;
         let otpCooldownTimer = null;
         let otpSecondsRemaining = 0;
@@ -808,7 +797,6 @@
         const changeEmailBtn = document.getElementById('changeEmailBtn');
         const emailVerifiedBadge = document.getElementById('emailVerifiedBadge');
 
-        // Start Resend OTP Cooldown Timer
         function startOtpCooldown(duration = 60) {
             otpSecondsRemaining = duration;
             if (sendOtpBtn) {
@@ -833,7 +821,6 @@
             }, 1000);
         }
 
-        // Send OTP Click Handler
         if (sendOtpBtn) {
             sendOtpBtn.addEventListener('click', async () => {
                 const emailVal = emailInput ? emailInput.value.trim() : '';
@@ -871,7 +858,6 @@
                             alert(resData.message || `OTP sent successfully to ${emailVal}`);
                         }
 
-                        // Expand OTP verification box and lock email input
                         if (otpVerificationBox) {
                             otpVerificationBox.style.display = 'flex';
                             otpVerificationBox.classList.add('active');
@@ -906,7 +892,6 @@
             });
         }
 
-        // Verify OTP Click Handler
         if (verifyOtpBtn) {
             verifyOtpBtn.addEventListener('click', async () => {
                 const emailVal = emailInput ? emailInput.value.trim() : '';
@@ -940,7 +925,6 @@
                             alert('Email verified successfully!');
                         }
 
-                        // Update UI states on success
                         if (emailVerifiedBadge) emailVerifiedBadge.style.display = 'inline-flex';
                         if (sendOtpBtn) sendOtpBtn.style.display = 'none';
                         if (otpVerificationBox) otpVerificationBox.style.display = 'none';
@@ -971,7 +955,6 @@
             });
         }
 
-        // Change Email Button Click Handler
         if (changeEmailBtn) {
             changeEmailBtn.addEventListener('click', () => {
                 clearInterval(otpCooldownTimer);
@@ -995,7 +978,6 @@
             });
         }
 
-        // Form Submit Handler
         document.getElementById('student-register-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const submitBtn = document.getElementById('submit-btn');
@@ -1003,7 +985,6 @@
             const semesterVal = document.getElementById('semesterSelect').value;
             const secVal = document.getElementById('sectionSelect').value;
 
-            // 1. Email OTP Verification Guard
             if (!isEmailVerified) {
                 if (typeof showToast === 'function') {
                     showToast('Please verify your email address via OTP first.', 'warning');
@@ -1044,8 +1025,6 @@
                 password: document.getElementById('password').value,
                 phone: document.getElementById('phone').value.trim() || null
             };
-
-            console.log("Sending Student Registration payload:", payload);
 
             try {
                 const response = await fetch(`${API_BASE_URL}/auth/student/register`, {
