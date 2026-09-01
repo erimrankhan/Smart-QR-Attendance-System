@@ -1,5 +1,5 @@
 /**
- * Smart QR Attendance System - Faculty (Teacher) Portal Suite Logic
+ * Smart QR Attendance System - Faculty Portal Suite Logic (Updated & Fixed)
  */
 
 const HOST_IP = (window.location.hostname && window.location.hostname !== '') ? window.location.hostname : 'localhost';
@@ -16,19 +16,35 @@ let currentReportData = null;
 let currentAssignedClasses = [];
 
 // Initialize on Page Load
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    if (typeof hideLoading === 'function') hideLoading();
+    const hungLoader = document.getElementById('global-loader');
+    if (hungLoader) {
+        hungLoader.classList.remove('active');
+        hungLoader.style.display = 'none';
+        hungLoader.style.pointerEvents = 'none';
+    }
+
     checkAuth();
     initTheme();
-    loadDashboardSummary();
     initEventListeners();
     initResourceUpload();
     initProfileListeners();
     initAnnouncementForm();
-    loadTeacherAnnouncements();
-    loadTeacherProfile();
-    searchStudentDirectory();
 
-    // Show login toast on right side when landing on dashboard
+    try {
+        await Promise.allSettled([
+            loadDashboardSummary(),
+            loadTeacherAnnouncements(),
+            loadTeacherProfile(),
+            searchStudentDirectory()
+        ]);
+    } catch (err) {
+        console.warn('Initial faculty data load warning:', err);
+    } finally {
+        if (typeof hideLoading === 'function') hideLoading();
+    }
+
     if (sessionStorage.getItem('justLoggedIn') === 'true') {
         sessionStorage.removeItem('justLoggedIn');
         const userStr = localStorage.getItem('teacherUser') || localStorage.getItem('user');
@@ -44,9 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * --------------------------------------------------------------------------
  * 1. AUTHENTICATION & NAVIGATION
- * --------------------------------------------------------------------------
  */
 function checkAuth() {
     const token = localStorage.getItem('teacherToken') || localStorage.getItem('token');
@@ -70,7 +84,6 @@ function checkAuth() {
         if (nameEl) nameEl.textContent = displayName;
 
         updateTopbarAvatar(user.profile_pic, displayName);
-
     } catch (e) {
         redirectToLogin();
     }
@@ -86,7 +99,7 @@ function updateTopbarAvatar(photoUrl, name) {
 
     if (photoUrl) {
         const fullUrl = photoUrl.startsWith('http') ? photoUrl : `${SERVER_URL}${photoUrl}`;
-        const imgHtml = `<img src="${fullUrl}" class="avatar-img" alt="${name || 'Teacher'}" style="width: 100%; height: 100%; object-fit: cover;">`;
+        const imgHtml = `<img src="${fullUrl}" class="avatar-img" alt="${name || 'Teacher'}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
         if (avatarEl) avatarEl.innerHTML = imgHtml;
         if (sidebarAvatarEl) sidebarAvatarEl.innerHTML = imgHtml;
     } else {
@@ -97,15 +110,15 @@ function updateTopbarAvatar(photoUrl, name) {
 }
 
 function getAuthHeaders() {
-    const token = localStorage.getItem('teacherToken') || localStorage.getItem('token');
-    return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-    };
+    const rawToken = localStorage.getItem('teacherToken') || localStorage.getItem('facultyToken') || localStorage.getItem('token');
+    const token = (rawToken && rawToken !== 'null' && rawToken !== 'undefined') ? rawToken.trim() : '';
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return headers;
 }
 
 function redirectToLogin() {
-    window.location.href = '/attendance/teacher/login.html';
+    window.location.href = 'login.html';
 }
 
 function initTheme() {
@@ -132,85 +145,113 @@ function updateThemeIcon(theme) {
     }
 }
 
+function initPortalDrawer() {
+    const sidebar = document.querySelector('.sidebar') || document.getElementById('sidebar');
+    let backdrop = document.getElementById('portalBackdrop') || document.getElementById('sidebarBackdrop') || document.querySelector('.portal-backdrop') || document.getElementById('mobileOverlay');
+
+    if (!backdrop) {
+        backdrop = document.createElement('div');
+        backdrop.id = 'portalBackdrop';
+        backdrop.className = 'portal-backdrop';
+        document.body.appendChild(backdrop);
+    }
+
+    function toggleSidebar(e) {
+        if (e && e.preventDefault) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        if (sidebar) {
+            sidebar.classList.toggle('drawer-open');
+            sidebar.classList.toggle('show-sidebar');
+            sidebar.classList.toggle('active');
+            sidebar.classList.toggle('open');
+        }
+        if (backdrop) {
+            backdrop.classList.toggle('visible');
+            backdrop.classList.toggle('active');
+            backdrop.classList.toggle('open');
+        }
+        const isOpen = sidebar && (sidebar.classList.contains('drawer-open') || sidebar.classList.contains('active') || sidebar.classList.contains('open'));
+        document.body.style.overflow = isOpen ? 'hidden' : '';
+    }
+    window.toggleSidebar = toggleSidebar;
+    window.toggleMobileMenu = toggleSidebar;
+
+    function closeSidebar(e) {
+        if (e && e.preventDefault) e.preventDefault();
+        if (sidebar) sidebar.classList.remove('drawer-open', 'show-sidebar', 'active', 'open');
+        if (backdrop) backdrop.classList.remove('visible', 'active', 'open');
+        document.body.style.overflow = '';
+    }
+    window.closeSidebar = closeSidebar;
+    window.closeMobileMenu = closeSidebar;
+
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('#portalSidebarToggle, #sidebarToggleBtn, #hamburgerBtn, #mobileMenuToggle, .portal-sidebar-toggle, .menu-toggle, .hamburger-btn, .sidebar-toggle-btn');
+        if (btn) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleSidebar();
+            return;
+        }
+
+        const closeBtn = e.target.closest('#portalSidebarClose, #sidebarCloseBtn, #mobileSidebarClose, .portal-sidebar-close, .sidebar-close-btn, .mobile-sidebar-close');
+        if (closeBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeSidebar();
+            return;
+        }
+    });
+
+    backdrop.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeSidebar();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' || e.key === 'Esc') closeSidebar();
+    });
+}
+
 function initEventListeners() {
-    const sidebar = document.getElementById('sidebar');
-    const mobileToggle = document.getElementById('mobileMenuToggle');
-    const mobileOverlay = document.getElementById('mobileOverlay');
+    initPortalDrawer();
 
-    const toggleMobileMenu = () => {
-        if (sidebar) sidebar.classList.toggle('open');
-        if (mobileOverlay) mobileOverlay.classList.toggle('active');
-    };
-
-    const closeMobileMenu = () => {
-        if (sidebar) sidebar.classList.remove('open');
-        if (mobileOverlay) mobileOverlay.classList.remove('active');
-    };
-
-    if (mobileToggle) mobileToggle.addEventListener('click', toggleMobileMenu);
-    if (mobileOverlay) mobileOverlay.addEventListener('click', closeMobileMenu);
-
-    // Sidebar Navigation SPA View Switcher
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
-            const targetId = item.getAttribute('data-target');
-            closeMobileMenu();
+            const targetId = item.getAttribute('data-target') || item.getAttribute('data-view');
+            if (typeof window.closeSidebar === 'function') window.closeSidebar();
             if (targetId) switchView(targetId);
         });
     });
 
     const handleLogout = (e) => {
         if (e) e.preventDefault();
+        if (typeof window.closeSidebar === 'function') window.closeSidebar();
         
+        const logoutAction = () => {
+            localStorage.clear();
+            sessionStorage.setItem('justLoggedOut', 'true');
+            window.location.href = 'login.html';
+        };
+
         if (typeof showConfirmModal === 'function') {
-            showConfirmModal(
-                'Confirm Account Logout',
-                'Are you sure you want to log out of your Faculty Portal account?',
-                () => {
-                    localStorage.removeItem('teacherToken');
-                    localStorage.removeItem('teacherUser');
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    localStorage.clear();
-                    sessionStorage.setItem('justLoggedOut', 'true');
-                    window.location.href = 'login.html';
-                },
-                'Logout',
-                'btn-danger'
-            );
-        } else {
-            // Fallback
-            const confirmLogout = confirm("Are you sure you want to securely logout?");
-            if (confirmLogout) {
-                localStorage.removeItem('teacherToken');
-                localStorage.removeItem('teacherUser');
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                localStorage.clear();
-                sessionStorage.setItem('justLoggedOut', 'true');
-                window.location.href = 'login.html';
-            }
+            showConfirmModal('Confirm Logout', 'Are you sure you want to log out of your Faculty Portal?', logoutAction, 'Logout', 'btn-danger');
+        } else if (confirm('Are you sure you want to securely logout?')) {
+            logoutAction();
         }
     };
 
-    document.querySelectorAll('.logout-btn').forEach(button => {
-        button.addEventListener('click', handleLogout);
-    });
+    document.querySelectorAll('.logout-btn').forEach(btn => btn.addEventListener('click', handleLogout));
 
     const topbarAvatar = document.getElementById('topbarAvatarContainer');
     const topbarUserInfo = document.querySelector('.header-user .user-info');
-    if (topbarAvatar) {
-        topbarAvatar.style.cursor = 'pointer';
-        topbarAvatar.addEventListener('click', () => switchView('profile-section'));
-    }
-    if (topbarUserInfo) {
-        topbarUserInfo.style.cursor = 'pointer';
-        topbarUserInfo.addEventListener('click', () => switchView('profile-section'));
-    }
+    if (topbarAvatar) topbarAvatar.addEventListener('click', () => switchView('profile-section'));
+    if (topbarUserInfo) topbarUserInfo.addEventListener('click', () => switchView('profile-section'));
 
-    // QR Session Form
     const startForm = document.getElementById('start-session-form');
     if (startForm) {
         startForm.addEventListener('submit', (e) => {
@@ -219,11 +260,8 @@ function initEventListeners() {
         });
     }
 
-    // Close Session Button
     const closeBtn = document.getElementById('close-session-btn');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', closeAttendanceSession);
-    }
+    if (closeBtn) closeBtn.addEventListener('click', closeAttendanceSession);
 }
 
 function switchView(targetId) {
@@ -242,7 +280,6 @@ function switchView(targetId) {
     }
     if (activeNav) activeNav.classList.add('active');
 
-    // Update Topbar Titles
     const titleEl = document.getElementById('view-title');
     const subtitleEl = document.getElementById('view-subtitle');
 
@@ -278,41 +315,61 @@ window.switchView = switchView;
 window.switchSection = switchView;
 
 /**
- * --------------------------------------------------------------------------
- * 2. DASHBOARD SUMMARY & OVERVIEW
- * --------------------------------------------------------------------------
+ * 2. DASHBOARD SUMMARY
  */
 async function loadDashboardSummary() {
     try {
         const response = await fetch(`${API_BASE_URL}/dashboard-summary`, { headers: getAuthHeaders() });
+        if (!response.ok && (response.status === 401 || response.status === 403)) {
+            redirectToLogin();
+            return;
+        }
+
         const resData = await response.json();
-
         if (response.ok && resData.status === 'success') {
-            const { totalClasses, totalStudents, assignedClasses, todayClasses, recentSessions, activeSession } = resData.data;
+            const { totalClasses, totalStudents, assignedClasses, todayClasses, recentSessions, activeSession } = resData.data || {};
+            currentAssignedClasses = assignedClasses || [];
+            const displayClasses = todayClasses || assignedClasses || [];
 
-            currentAssignedClasses = assignedClasses;
-            const displayClasses = todayClasses || assignedClasses; // Fallback just in case
-
-            // Stat Cards
             const classesEl = document.getElementById('dash-total-classes');
             const studentsEl = document.getElementById('dash-total-students');
             const statusEl = document.getElementById('dash-session-status');
 
             if (classesEl) classesEl.textContent = displayClasses.length;
-            if (studentsEl) studentsEl.textContent = totalStudents;
+            if (studentsEl) studentsEl.textContent = totalStudents || 0;
 
+            // Handle Active Session state
             if (statusEl) {
                 if (activeSession) {
                     statusEl.textContent = 'ACTIVE (Live)';
                     statusEl.style.color = '#10b981';
-                    activeSessionId = activeSession.id;
+
+                    // 1. Ensure activeSessionId is set properly
+                    activeSessionId = activeSession.id || activeSession.session_id;
+
+                    // 2. Extract PIN safely
+                    const pin = activeSession.session_pin || activeSession.sessionPin || activeSession.pin;
+                    if (pin) {
+                        updateSessionPinDisplay(pin);
+                    }
+
+                    // 3. Set dropdown and start polling if active
+                    const classSelect = document.getElementById('class-select');
+                    if (classSelect && activeSession.class_id) {
+                        classSelect.value = activeSession.class_id;
+                    }
+
+                    const activeContainer = document.getElementById('session-active-container');
+                    if (activeContainer) activeContainer.style.display = 'block';
+
+                    startLivePolling(activeSessionId);
                 } else {
                     statusEl.textContent = 'Inactive';
                     statusEl.style.color = 'var(--accent-emerald)';
+                    updateSessionPinDisplay(null);
                 }
             }
 
-            // Populate Assigned Classes Table
             const classesTbody = document.getElementById('assigned-classes-tbody');
             if (classesTbody) {
                 if (displayClasses.length === 0) {
@@ -320,12 +377,12 @@ async function loadDashboardSummary() {
                 } else {
                     classesTbody.innerHTML = displayClasses.map(c => `
                         <tr>
-                            <td><strong>${c.subject_name}</strong></td>
-                            <td><span style="background: rgba(99,102,241,0.15); color: var(--accent-primary); padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 11px;">${c.subject_code}</span></td>
+                            <td><strong>${c.subject_name}</strong> (${c.subject_code})</td>
+                            <td>${c.course_name}</td>
+                            <td>Semester ${c.semester_number}</td>
                             <td>Section ${c.section_name || 'A'}</td>
-                            <td>${c.department_name || 'General'}</td>
                             <td>
-                                <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="selectClassForSession(${c.class_id})">
+                                <button class="action-btn" onclick="startQuickSession('${c.class_id || c.id}')" style="background: rgba(13, 148, 136, 0.2); color: var(--accent-teal); padding: 5px 12px; font-size: 11px; font-weight: 700; border-radius: 6px; cursor: pointer;">
                                     <i class="fa-solid fa-play"></i> Start Session
                                 </button>
                             </td>
@@ -334,13 +391,11 @@ async function loadDashboardSummary() {
                 }
             }
 
-            // Populate Class Dropdowns
             populateClassDropdowns(assignedClasses);
 
-            // Populate Recent Sessions Table
             const sessionsTbody = document.getElementById('recent-sessions-tbody');
             if (sessionsTbody) {
-                if (recentSessions.length === 0) {
+                if (!recentSessions || recentSessions.length === 0) {
                     sessionsTbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No recent sessions recorded yet.</td></tr>`;
                 } else {
                     sessionsTbody.innerHTML = recentSessions.map(s => `
@@ -360,33 +415,52 @@ async function loadDashboardSummary() {
     }
 }
 
-function populateClassDropdowns(classes) {
-    const dropdowns = ['class-select', 'student-filter-class', 'report-class-select', 'resource-class-select', 'announcement-class-select'];
+function updateSessionPinDisplay(pin) {
+    const pinEl = document.getElementById('session-pin-display');
+    if (!pinEl) return;
 
+    if (pin && String(pin).trim() !== '' && String(pin) !== 'undefined' && String(pin) !== 'null') {
+        pinEl.textContent = String(pin).trim();
+        pinEl.innerText = String(pin).trim();
+    } else {
+        pinEl.textContent = '--------';
+        pinEl.innerText = '--------';
+    }
+}
+window.updateSessionPinDisplay = updateSessionPinDisplay;
+
+function populateClassDropdowns(classes = null) {
+    const list = classes || currentAssignedClasses || [];
+    if (!Array.isArray(list) || list.length === 0) return;
+
+    const dropdowns = ['class-select', 'student-filter-class', 'report-class-select', 'resource-class-select', 'announcement-class-select'];
     dropdowns.forEach(id => {
         const select = document.getElementById(id);
         if (select) {
             const currentVal = select.value;
             select.innerHTML = '<option value="">Select a Class / Subject...</option>' +
-                classes.map(c => `<option value="${c.class_id}">${c.subject_name} (${c.subject_code}) - Sec ${c.section_name || 'A'}</option>`).join('');
+                list.map(c => `<option value="${c.class_id || c.id}">${c.subject_name} (${c.subject_code || ''}) - Sec ${c.section_name || 'A'}</option>`).join('');
             if (currentVal) select.value = currentVal;
         }
     });
 }
 
-function selectClassForSession(classId) {
+function startQuickSession(classId) {
     switchView('classes-section');
     const select = document.getElementById('class-select');
-    if (select) select.value = classId;
+    if (select) {
+        select.value = classId;
+        startAttendanceSession();
+    }
 }
+window.startQuickSession = startQuickSession;
 
 /**
- * --------------------------------------------------------------------------
- * 3. ATTENDANCE ENGINE & DYNAMIC QR CONTROLLERS
- * --------------------------------------------------------------------------
+ * 3. ATTENDANCE & LIVE POLLING
  */
 async function startAttendanceSession() {
-    const classId = document.getElementById('class-select').value;
+    const select = document.getElementById('class-select');
+    const classId = select ? select.value : '';
     if (!classId) {
         showToast('Please select a class first.', 'error');
         return;
@@ -400,20 +474,26 @@ async function startAttendanceSession() {
         });
         const resData = await response.json();
 
-        if (response.ok && resData.status === 'success') {
-            const { sessionId, qrHash } = resData.data;
+        if (response.ok && (resData.status === 'success' || resData.success)) {
+            const sessionId = resData.sessionId || resData.session_id || resData.data?.sessionId || resData.data?.session_id;
+            const qrHash = resData.qrHash || resData.qr_token || resData.data?.qrHash || resData.data?.qr_token;
+            const sessionPin = resData.session_pin || resData.sessionPin || resData.pin || resData.data?.session_pin || resData.data?.sessionPin || resData.data?.pin;
+            
             activeSessionId = sessionId;
 
-            const selectedClassId = document.getElementById('class-select')?.value;
-            const selectedClass = (typeof currentAssignedClasses !== 'undefined' && Array.isArray(currentAssignedClasses))
-                ? (currentAssignedClasses.find(c => c.class_id == selectedClassId) || {})
+            // Update Classroom PIN Display
+            updateSessionPinDisplay(sessionPin);
+
+            const selectedClass = (Array.isArray(currentAssignedClasses))
+                ? (currentAssignedClasses.find(c => (c.class_id == classId || c.id == classId)) || {})
                 : {};
 
             const qrPayload = {
                 session_id: sessionId,
-                course_id: selectedClass.course_id || selectedClass.department_id || selectedClassId || 'CS-2026',
+                course_id: selectedClass.course_id || 'CS-2026',
                 subject_id: selectedClass.subject_id || selectedClass.subject_code || 'SUB-101',
                 qrHash: qrHash,
+                pin: sessionPin,
                 timestamp: Date.now()
             };
 
@@ -423,13 +503,18 @@ async function startAttendanceSession() {
                 renderQRCode(qrPayload);
             }
 
-            document.getElementById('session-active-container').style.display = 'block';
-            document.getElementById('dash-session-status').textContent = 'ACTIVE (Live)';
-            document.getElementById('dash-session-status').style.color = '#10b981';
+            const activeContainer = document.getElementById('session-active-container');
+            if (activeContainer) activeContainer.style.display = 'block';
+
+            const statusEl = document.getElementById('dash-session-status');
+            if (statusEl) {
+                statusEl.textContent = 'ACTIVE (Live)';
+                statusEl.style.color = '#10b981';
+            }
 
             startCountdown(60);
             startLivePolling(sessionId);
-            showToast('Attendance session initiated! Dynamic QR Code active.');
+            showToast(`Attendance session initiated! PIN: ${sessionPin || 'Active'}`);
         } else {
             showToast(resData.message || 'Failed to start session.', 'error');
         }
@@ -451,19 +536,32 @@ async function regenerateActiveQR() {
         });
         const resData = await response.json();
 
-        if (response.ok && resData.status === 'success') {
-            const { qrHash } = resData.data;
+        if (response.ok && (resData.status === 'success' || resData.success)) {
+            // Robust PIN extraction from all possible payload levels
+            const sessionPin = resData.session_pin 
+                            || resData.pin 
+                            || resData.sessionPin 
+                            || (resData.data && (resData.data.session_pin || resData.data.pin || resData.data.sessionPin));
 
+            const qrHash = resData.qrHash 
+                        || resData.qr_token 
+                        || (resData.data && (resData.data.qrHash || resData.data.qr_token));
+
+            // 1. Instantly Update Classroom PIN Display Box
+            updateSessionPinDisplay(sessionPin);
+
+            // 2. Generate QR
             const selectedClassId = document.getElementById('class-select')?.value;
-            const selectedClass = (typeof currentAssignedClasses !== 'undefined' && Array.isArray(currentAssignedClasses))
-                ? (currentAssignedClasses.find(c => c.class_id == selectedClassId) || {})
+            const selectedClass = (Array.isArray(currentAssignedClasses))
+                ? (currentAssignedClasses.find(c => c.class_id == selectedClassId || c.id == selectedClassId) || {})
                 : {};
 
             const qrPayload = {
                 session_id: activeSessionId,
-                course_id: selectedClass.course_id || selectedClass.department_id || selectedClassId || 'CS-2026',
+                course_id: selectedClass.course_id || 'CS-2026',
                 subject_id: selectedClass.subject_id || selectedClass.subject_code || 'SUB-101',
                 qrHash: qrHash,
+                pin: sessionPin,
                 timestamp: Date.now()
             };
 
@@ -472,37 +570,35 @@ async function regenerateActiveQR() {
             } else {
                 renderQRCode(qrPayload);
             }
+
             startCountdown(60);
-            showToast('Dynamic QR Code regenerated successfully!');
+            showToast(`QR & PIN regenerated! New PIN: ${sessionPin || 'Active'}`, 'success');
         } else {
-            showToast(resData.message || 'Failed to regenerate QR code.', 'error');
+            showToast(resData.message || 'Failed to regenerate QR & PIN.', 'error');
         }
     } catch (err) {
-        showToast('Error regenerating QR code.', 'error');
+        console.error('Error regenerating QR code:', err);
+        showToast('Error communicating with server.', 'error');
     }
 }
 
 function renderQRCode(qrData) {
-    if (typeof generateFacultyQRCode === 'function') {
-        return generateFacultyQRCode(qrData);
-    }
-
     const container = document.getElementById('qrcode');
     if (!container) return;
 
-    const textToEncode = (typeof qrData === 'object' && qrData !== null)
-        ? JSON.stringify(qrData)
-        : qrData;
-
+    const textToEncode = (typeof qrData === 'object' && qrData !== null) ? JSON.stringify(qrData) : qrData;
     container.innerHTML = '';
-    qrCodeInstance = new QRCode(container, {
-        text: textToEncode,
-        width: 220,
-        height: 220,
-        colorDark: '#0f172a',
-        colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.H
-    });
+    
+    if (typeof QRCode !== 'undefined') {
+        qrCodeInstance = new QRCode(container, {
+            text: textToEncode,
+            width: 220,
+            height: 220,
+            colorDark: '#0f172a',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.H
+        });
+    }
 }
 
 function startCountdown(seconds) {
@@ -515,8 +611,11 @@ function startCountdown(seconds) {
         if (timerDisplay) timerDisplay.textContent = `${remainingSeconds}s`;
 
         if (remainingSeconds <= 0) {
-            clearInterval(countdownTimer);
-            closeAttendanceSession();
+            if (activeSessionId) {
+                regenerateActiveQR();
+            } else {
+                clearInterval(countdownTimer);
+            }
         }
     }, 1000);
 }
@@ -524,39 +623,52 @@ function startCountdown(seconds) {
 function startLivePolling(sessionId) {
     clearInterval(livePollingInterval);
     fetchLiveScans(sessionId);
-
     livePollingInterval = setInterval(() => {
         fetchLiveScans(sessionId);
     }, 3000);
 }
 
 async function fetchLiveScans(sessionId) {
+    if (!sessionId) return;
     try {
-        const response = await fetch(`${API_BASE_URL}/live-attendance/${sessionId}`, { headers: getAuthHeaders() });
+        // Added timestamp (?t=...) to completely bypass 304 Not Modified cache
+        const response = await fetch(`${API_BASE_URL}/live-attendance/${sessionId}?t=${Date.now()}`, { 
+            headers: getAuthHeaders(),
+            cache: 'no-store'
+        });
         const resData = await response.json();
 
-        if (response.ok && resData.status === 'success') {
-            const { presentStudents, absentStudents, totalScanned, totalAbsent } = resData.data;
+        if (response.ok && resData.status === 'success' && resData.data) {
+            // Update PIN if available in live session data
+            const livePin = resData.data.sessionPin || resData.data.session_pin;
+            if (livePin) {
+                updateSessionPinDisplay(livePin);
+            }
+
+            const presentStudents = resData.data.presentStudents || [];
+            const absentStudents = resData.data.absentStudents || [];
+            const totalScanned = resData.data.totalScanned || presentStudents.length;
+            const totalAbsent = resData.data.totalAbsent || absentStudents.length;
 
             const pCountEl = document.getElementById('live-present-count');
             const aCountEl = document.getElementById('live-absent-count');
             if (pCountEl) pCountEl.textContent = totalScanned;
             if (aCountEl) aCountEl.textContent = totalAbsent;
 
-            // Render Present Students Tbody
+            // Render Present Table
             const pTbody = document.getElementById('live-present-tbody');
             if (pTbody) {
                 if (presentStudents.length === 0) {
-                    pTbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Waiting for student QR scans...</td></tr>`;
+                    pTbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">Waiting for student QR scans...</td></tr>`;
                 } else {
                     pTbody.innerHTML = presentStudents.map(s => `
                         <tr>
                             <td><strong>${s.roll_no || 'N/A'}</strong></td>
-                            <td>${s.student_name}</td>
-                            <td>${s.enrollment_no}</td>
-                            <td>${new Date(s.scanned_at).toLocaleTimeString()}</td>
+                            <td>${s.student_name || s.name}</td>
+                            <td>${s.enrollment_no || '-'}</td>
+                            <td>${s.scanned_at ? new Date(s.scanned_at).toLocaleTimeString() : 'Just now'}</td>
                             <td>
-                                <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px; background: rgba(244,63,94,0.15); color: #f43f5e; border: 1px solid rgba(244,63,94,0.3);" onclick="manualMarkStudent(${s.student_id}, 'Absent')">
+                                <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px; background: rgba(244,63,94,0.15); color: #f43f5e; border: 1px solid rgba(244,63,94,0.3); border-radius: 4px; cursor: pointer;" onclick="manualMarkStudent(${s.student_id || s.id}, 'Absent')">
                                     <i class="fa-solid fa-xmark"></i> Mark Absent
                                 </button>
                             </td>
@@ -565,20 +677,20 @@ async function fetchLiveScans(sessionId) {
                 }
             }
 
-            // Render Absent Students Tbody
+            // Render Absent Table
             const aTbody = document.getElementById('live-absent-tbody');
             if (aTbody) {
                 if (absentStudents.length === 0) {
-                    aTbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">All section students are present!</td></tr>`;
+                    aTbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">All section students are present!</td></tr>`;
                 } else {
                     aTbody.innerHTML = absentStudents.map(s => `
                         <tr>
                             <td><strong>${s.roll_no || 'N/A'}</strong></td>
-                            <td>${s.student_name}</td>
-                            <td>${s.enrollment_no}</td>
+                            <td>${s.student_name || s.name}</td>
+                            <td>${s.enrollment_no || '-'}</td>
                             <td>${s.phone || '-'}</td>
                             <td>
-                                <button class="btn btn-primary" style="font-size: 11px; padding: 4px 10px; background: rgba(16,185,129,0.2); color: var(--accent-emerald); border: 1px solid rgba(16,185,129,0.4);" onclick="manualMarkStudent(${s.student_id}, 'Present')">
+                                <button class="btn btn-primary" style="font-size: 11px; padding: 4px 10px; background: rgba(16,185,129,0.2); color: var(--accent-emerald); border: 1px solid rgba(16,185,129,0.4); border-radius: 4px; cursor: pointer;" onclick="manualMarkStudent(${s.student_id || s.id}, 'Present')">
                                     <i class="fa-solid fa-check"></i> Mark Present
                                 </button>
                             </td>
@@ -589,25 +701,6 @@ async function fetchLiveScans(sessionId) {
         }
     } catch (err) {
         console.error('Error fetching live scans:', err);
-    }
-}
-
-function switchLiveTab(tab) {
-    const presentTab = document.getElementById('live-tab-present');
-    const absentTab = document.getElementById('live-tab-absent');
-    const pBtn = document.getElementById('tab-present-btn');
-    const aBtn = document.getElementById('tab-absent-btn');
-
-    if (tab === 'present') {
-        if (presentTab) presentTab.style.display = 'block';
-        if (absentTab) absentTab.style.display = 'none';
-        if (pBtn) { pBtn.className = 'btn btn-primary'; }
-        if (aBtn) { aBtn.className = 'btn btn-secondary'; }
-    } else {
-        if (presentTab) presentTab.style.display = 'none';
-        if (absentTab) absentTab.style.display = 'block';
-        if (pBtn) { pBtn.className = 'btn btn-secondary'; }
-        if (aBtn) { aBtn.className = 'btn btn-primary'; }
     }
 }
 
@@ -627,7 +720,7 @@ async function manualMarkStudent(studentId, status) {
 
         if (response.ok && resData.status === 'success') {
             showToast(`Student marked as ${status}!`);
-            if (activeSessionId) fetchLiveScans(activeSessionId);
+            fetchLiveScans(activeSessionId);
         } else {
             showToast(resData.message || 'Failed to mark status.', 'error');
         }
@@ -648,18 +741,21 @@ async function closeAttendanceSession() {
             headers: getAuthHeaders()
         });
 
-        showToast('Attendance session closed.');
-        document.getElementById('dash-session-status').textContent = 'Inactive';
-        document.getElementById('dash-session-status').style.color = 'var(--accent-emerald)';
+        showToast('Attendance session closed successfully.');
+        activeSessionId = null;
+        updateSessionPinDisplay(null);
+        const statusEl = document.getElementById('dash-session-status');
+        if (statusEl) {
+            statusEl.textContent = 'Inactive';
+            statusEl.style.color = 'var(--accent-emerald)';
+        }
     } catch (err) {
         console.error('Error closing session:', err);
     }
 }
 
 /**
- * --------------------------------------------------------------------------
  * 4. STUDENT DIRECTORY SEARCH
- * --------------------------------------------------------------------------
  */
 async function searchStudentDirectory() {
     const queryInput = document.getElementById('student-search-input');
@@ -704,9 +800,7 @@ async function searchStudentDirectory() {
 }
 
 /**
- * --------------------------------------------------------------------------
  * 5. COMPREHENSIVE ATTENDANCE REPORTS & EXPORTS
- * --------------------------------------------------------------------------
  */
 function toggleReportFilters() {
     const type = document.getElementById('report-type-select').value;
@@ -840,41 +934,6 @@ function printReport() {
     window.print();
 }
 
-/**
- * --------------------------------------------------------------------------
- * 6. CLASS ANNOUNCEMENTS & STUDY MATERIALS
- * --------------------------------------------------------------------------
- */
-function initAnnouncementForm() {
-    const form = document.getElementById('announcement-form');
-    if (!form) return;
-
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const class_id = document.getElementById('announcement-class-select').value;
-        const type = document.getElementById('announcement-type').value;
-        const message = document.getElementById('announcement-msg').value;
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/send-announcement`, {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ class_id, type, message })
-            });
-            const resData = await response.json();
-
-            if (response.ok && resData.status === 'success') {
-                showToast(resData.message || 'Announcement dispatched successfully!');
-                form.reset();
-            } else {
-                showToast(resData.message || 'Failed to send announcement.', 'error');
-            }
-        } catch (err) {
-            showToast('Error sending class announcement.', 'error');
-        }
-    });
-}
-
 function initResourceUpload() {
     const uploadForm = document.getElementById('upload-resource-form');
     if (uploadForm) {
@@ -888,6 +947,13 @@ function initResourceUpload() {
             if (!class_id || !title || !fileInput.files[0]) {
                 showToast('Please fill all required fields.', 'error');
                 return;
+            }
+
+            const submitBtn = uploadForm.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn ? submitBtn.innerHTML : 'Upload Resource';
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
             }
 
             const formData = new FormData();
@@ -906,14 +972,20 @@ function initResourceUpload() {
                 const resData = await response.json();
 
                 if (response.ok && resData.status === 'success') {
-                    showToast('Study material uploaded successfully!');
+                    showToast('Study material uploaded successfully!', 'success');
                     uploadForm.reset();
-                    fetchTeacherResources();
+                    await fetchTeacherResources();
                 } else {
                     showToast(resData.message || 'Failed to upload document.', 'error');
                 }
             } catch (err) {
+                console.error('Error uploading resource:', err);
                 showToast('Error uploading resource.', 'error');
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                }
             }
         });
     }
@@ -927,66 +999,81 @@ async function fetchTeacherResources() {
 
     try {
         const response = await fetch(`${RESOURCE_API_URL}/teacher-list`, { headers: getAuthHeaders() });
-        if (!response.ok) return;
+        if (!response.ok) {
+            tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 16px;">Failed to load study materials.</td></tr>`;
+            return;
+        }
 
         const resData = await response.json();
         if (resData.status === 'success') {
-            const resources = resData.data;
+            const resources = resData.data || [];
 
             if (resources.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">No study materials uploaded yet.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 16px;">No study materials uploaded yet.</td></tr>`;
             } else {
-                tbody.innerHTML = resources.map(r => `
-                    <tr>
-                        <td>
-                            <a href="${SERVER_URL}${r.file_url}" target="_blank" style="color: var(--accent-primary); font-weight: 700; text-decoration: none;">
-                                <i class="fa-solid fa-file-pdf"></i> ${r.title}
-                            </a>
-                        </td>
-                        <td>${r.subject_name || 'Class'}</td>
-                        <td>${new Date(r.uploaded_at).toLocaleDateString()}</td>
-                    </tr>
-                `).join('');
+                tbody.innerHTML = resources.map(r => {
+                    const downloadUrl = r.downloadUrl || (r.file_path ? `${SERVER_URL}${r.file_path}` : `${SERVER_URL}${r.file_url}`);
+                    const uploadDate = r.uploaded_at || r.created_at;
+                    const dateDisplay = uploadDate ? new Date(uploadDate).toLocaleDateString() : 'Recent';
+                    return `
+                        <tr>
+                            <td>
+                                <a href="${downloadUrl}" target="_blank" download style="color: var(--accent-primary); font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-file-pdf"></i> ${r.title}
+                                </a>
+                            </td>
+                            <td>${r.subject_name || (r.subject_code ? `Subject (${r.subject_code})` : 'Class')}</td>
+                            <td>${dateDisplay}</td>
+                        </tr>
+                    `;
+                }).join('');
             }
         }
     } catch (err) {
         console.error('Error fetching teacher resources:', err);
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--accent-rose); padding: 16px;">Error loading uploaded materials.</td></tr>`;
     }
 }
 
 /**
- * --------------------------------------------------------------------------
- * 6. CLASS ANNOUNCEMENTS BROADCSTER & LOG
- * --------------------------------------------------------------------------
+ * 6. CLASS ANNOUNCEMENTS
  */
-async function loadTeacherAnnouncements() {
-    const listEl = document.getElementById('teacher-announcements-list');
+async function loadSentAnnouncements() {
+    const listEl = document.getElementById('teacher-announcements-list') || document.getElementById('sentAnnouncementsList') || document.getElementById('announcements-log');
     if (!listEl) return;
 
     try {
         const response = await fetch(`${API_BASE_URL}/announcements`, { headers: getAuthHeaders() });
         const resData = await response.json();
 
-        if (response.ok && resData.status === 'success') {
+        if (response.ok && (resData.success || resData.status === 'success')) {
             const announcements = resData.data;
             if (!announcements || announcements.length === 0) {
-                listEl.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 24px;">No announcements sent yet.</div>`;
+                listEl.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 28px;">No announcements sent yet. Broadcast one using the form!</div>`;
                 return;
             }
 
             listEl.innerHTML = announcements.map(a => {
-                const dateStr = new Date(a.created_at).toLocaleString();
-                let badgeStyle = 'background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3);';
-                if (a.type === 'success') badgeStyle = 'background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3);';
-                if (a.type === 'warning') badgeStyle = 'background: rgba(244, 63, 94, 0.15); color: var(--accent-rose); border: 1px solid rgba(244, 63, 94, 0.3);';
+                const dateStr = a.created_at ? new Date(a.created_at).toLocaleString() : 'Just now';
+                const pType = (a.type || a.priority || 'info').toLowerCase();
 
-                const targetName = a.subject_name ? `${a.subject_name} (${a.section_name || 'Section'})` : 'Enrolled Class';
+                let badgeStyle = 'background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3);';
+                let badgeLabel = 'General Notice';
+                if (pType === 'success') {
+                    badgeStyle = 'background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3);';
+                    badgeLabel = 'Exam / Assignment';
+                } else if (pType === 'warning' || pType === 'urgent' || pType === 'high') {
+                    badgeStyle = 'background: rgba(244, 63, 94, 0.15); color: var(--accent-rose); border: 1px solid rgba(244, 63, 94, 0.3);';
+                    badgeLabel = 'Urgent Alert';
+                }
+
+                const targetName = a.subject_name ? `${a.subject_name} (${a.section_name ? `Sec ${a.section_name}` : 'Section'})` : (a.title || 'Enrolled Class');
 
                 return `
                     <div style="background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
-                            <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">${a.title || targetName}</span>
-                            <span style="${badgeStyle} padding: 3px 9px; border-radius: 12px; font-size: 10.5px; font-weight: 700; text-transform: uppercase;">${a.type}</span>
+                            <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">${targetName}</span>
+                            <span style="${badgeStyle} padding: 3px 9px; border-radius: 12px; font-size: 10.5px; font-weight: 700; text-transform: uppercase;">${badgeLabel}</span>
                         </div>
                         <p style="font-size: 12.5px; color: var(--text-secondary); margin: 0; line-height: 1.5; word-break: break-word;">${a.message}</p>
                         <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--glass-border); padding-top: 6px; margin-top: 2px;">
@@ -996,57 +1083,100 @@ async function loadTeacherAnnouncements() {
                     </div>
                 `;
             }).join('');
+        } else {
+            listEl.innerHTML = `<div style="text-align: center; color: var(--accent-rose); padding: 20px;">Failed to load announcements log.</div>`;
         }
     } catch (err) {
         console.error('Error fetching teacher announcements:', err);
+        listEl.innerHTML = `<div style="text-align: center; color: var(--accent-rose); padding: 20px;">Error connecting to server.</div>`;
     }
 }
 
+const loadTeacherAnnouncements = loadSentAnnouncements;
+window.loadTeacherAnnouncements = loadSentAnnouncements;
+window.loadSentAnnouncements = loadSentAnnouncements;
+
 function initAnnouncementForm() {
-    const form = document.getElementById('announcement-form');
-    if (!form) return;
+    const form = document.getElementById('announcement-form') || document.getElementById('announcementForm');
+    const submitBtn = document.getElementById('announcement-submit-btn') || document.getElementById('broadcastAnnouncementBtn');
 
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const class_id = document.getElementById('announcement-class-select').value;
-        const type = document.getElementById('announcement-type').value;
-        const message = document.getElementById('announcement-msg').value;
+    if (!form && !submitBtn) return;
 
-        if (!class_id || !message.trim()) {
-            showToast('Please select a target class and enter message text.', 'error');
+    const handleBroadcast = async (e) => {
+        if (e) e.preventDefault();
+
+        const classSelect = document.getElementById('announcement-class-select') || document.getElementById('announcementClassSelect') || document.getElementById('class-select');
+        const typeSelect = document.getElementById('announcement-type') || document.getElementById('announcementPriority') || document.getElementById('alert-priority');
+        const msgTextarea = document.getElementById('announcement-msg') || document.getElementById('announcementMessage') || document.getElementById('announcement-message');
+
+        const class_id = classSelect ? classSelect.value : '';
+        const priority = typeSelect ? typeSelect.value : 'info';
+        const message = msgTextarea ? msgTextarea.value : '';
+
+        if (!class_id || !class_id.trim()) {
+            showToast('Please select a target class section.', 'error');
+            if (classSelect) classSelect.focus();
             return;
         }
 
-        const submitBtn = document.getElementById('announcement-submit-btn');
-        if (submitBtn) submitBtn.disabled = true;
+        if (!message || !message.trim()) {
+            showToast('Please enter an announcement message.', 'error');
+            if (msgTextarea) msgTextarea.focus();
+            return;
+        }
+
+        const btn = submitBtn || (form ? form.querySelector('button[type="submit"]') : null);
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Broadcasting...';
+        }
 
         try {
-            const response = await fetch(`${API_BASE_URL}/send-announcement`, {
+            const token = localStorage.getItem('teacherToken') || localStorage.getItem('token');
+            const response = await fetch(`${API_BASE_URL}/announcements`, {
                 method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ class_id, type, message })
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ 
+                    class_id, 
+                    type: priority, 
+                    priority, 
+                    message: message.trim() 
+                })
             });
             const resData = await response.json();
 
-            if (response.ok && resData.status === 'success') {
-                showToast(resData.message || 'Announcement broadcast successfully!');
-                form.reset();
-                loadTeacherAnnouncements();
+            if (response.ok && (resData.success || resData.status === 'success')) {
+                showToast(resData.message || 'Announcement broadcast successfully!', 'success');
+                if (msgTextarea) msgTextarea.value = '';
+                if (form) form.reset();
+                loadSentAnnouncements();
             } else {
                 showToast(resData.message || 'Failed to dispatch announcement.', 'error');
             }
         } catch (err) {
-            showToast('Error broadcasting announcement.', 'error');
+            console.error('Error broadcasting announcement:', err);
+            showToast('Error broadcasting announcement to server.', 'error');
         } finally {
-            if (submitBtn) submitBtn.disabled = false;
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-bullhorn" style="margin-right: 8px;"></i> Broadcast Announcement Now';
+            }
         }
-    });
+    };
+
+    if (form) {
+        form.addEventListener('submit', handleBroadcast);
+    }
+    if (submitBtn && submitBtn.type !== 'submit') {
+        submitBtn.addEventListener('click', handleBroadcast);
+    }
 }
 
 /**
- * --------------------------------------------------------------------------
  * 7. FACULTY PROFILE & SECURITY
- * --------------------------------------------------------------------------
  */
 async function loadTeacherProfile() {
     try {

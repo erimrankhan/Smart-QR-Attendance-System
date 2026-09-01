@@ -132,109 +132,125 @@ exports.getDashboardSummary = async (req, res) => {
  */
 
 /**
- * Mark Attendance via QR Code Scan
+ * Mark Attendance via QR Code Scan OR 8-Digit Dynamic PIN Fallback
  * POST /api/student/mark-attendance
  */
 exports.markAttendance = async (req, res) => {
-    console.log("RECEIVED BODY:", req.body);
+    const student_id = req.user ? req.user.id : (req.body.student_id || req.body.studentId);
+    let sessionId = req.body.session_id || req.body.sessionId;
+    const qrToken = req.body.qr_token || req.body.qrToken || req.body.qrHash;
+    const rawPin = req.body.pin || req.body.session_pin || req.body.sessionPin;
+    const pin = rawPin ? String(rawPin).trim() : null;
 
-    const sessionId = req.body.session_id || req.body.sessionId;
-    const qrToken = req.body.qr_token || req.body.qrToken || req.body.qrHash || req.body.qr_hash;
-    const student_id = req.user ? req.user.id : req.body.student_id;
+    if (!student_id) {
+        return res.status(401).json({
+            success: false,
+            status: 'fail',
+            message: 'Unauthorized. Student login profile required.'
+        });
+    }
 
-    if (!sessionId) {
-        console.log("MISSING SESSION ID IN REQ.BODY:", req.body);
+    if (!qrToken && !pin && !sessionId) {
         return res.status(400).json({
             success: false,
             status: 'fail',
-            message: 'Attendance session is inactive or QR token is invalid.'
+            message: 'Either QR Code scan, 8-Digit PIN, or active session is required.'
         });
     }
 
     try {
-        // Query strictly by session_id without status and token in SQL
-        const [sessions] = await pool.query(`
-            SELECT ses.id, ses.class_id, ses.qr_code_hash, ses.status, ses.expires_at, sub.name AS subject_name
-            FROM AttendanceSessions ses
-            JOIN Classes c ON ses.class_id = c.id
-            JOIN Subjects sub ON c.subject_id = sub.id
-            WHERE ses.id = ?
-        `, [sessionId]);
+        let session = null;
 
-        const sessionRecord = (sessions && sessions.length > 0) ? sessions[0] : null;
+        // CASE 1: Student submitted an 8-Digit PIN (No session_id or with session_id)
+        if (pin) {
+            const [pinSessions] = await pool.query(`
+                SELECT ses.id, ses.qr_code_hash, ses.session_pin, ses.status, sub.name AS subject_name, ses.class_id
+                FROM AttendanceSessions ses
+                JOIN Classes c ON ses.class_id = c.id
+                JOIN Subjects sub ON c.subject_id = sub.id
+                WHERE ses.session_pin = ? AND ses.status = 'Active'
+                ORDER BY ses.id DESC
+                LIMIT 1
+            `, [pin]);
 
-        console.log("DB SESSION DATA:", sessionRecord);
+            if (pinSessions.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    status: 'fail',
+                    message: 'Invalid or expired 8-Digit Classroom PIN.'
+                });
+            }
 
-        if (!sessionRecord) {
-            console.log("SESSION ID NOT FOUND IN DB:", sessionId);
-            return res.status(404).json({
-                success: false,
-                status: 'fail',
-                error: "Session ID not found in DB",
-                message: "Session ID not found in DB"
-            });
+            session = pinSessions[0];
+            sessionId = session.id;
+        } 
+        // CASE 2: Student submitted QR Token / Hash
+        else if (qrToken || sessionId) {
+            let sessionQuery = `
+                SELECT ses.id, ses.qr_code_hash, ses.session_pin, ses.status, sub.name AS subject_name
+                FROM AttendanceSessions ses
+                JOIN Classes c ON ses.class_id = c.id
+                JOIN Subjects sub ON c.subject_id = sub.id
+                WHERE ses.status = 'Active'
+            `;
+            const params = [];
+
+            if (sessionId) {
+                sessionQuery += ` AND ses.id = ?`;
+                params.push(sessionId);
+            }
+            if (qrToken) {
+                sessionQuery += ` AND ses.qr_code_hash = ?`;
+                params.push(String(qrToken).trim());
+            }
+
+            const [sessions] = await pool.query(sessionQuery, params);
+
+            if (sessions.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    status: 'fail',
+                    message: 'Attendance QR session is inactive, expired, or invalid.'
+                });
+            }
+
+            session = sessions[0];
+            sessionId = session.id;
         }
 
-        const dbStatus = sessionRecord.status ? String(sessionRecord.status) : '';
-        const dbToken = sessionRecord.qr_code_hash || sessionRecord.qr_token || '';
-
-        if (dbStatus.toLowerCase() !== 'active') {
-            console.log("STATUS MISMATCH: DB status =", dbStatus, " | EXPECTED = active");
-        }
-
-        if (dbToken !== String(qrToken)) {
-            console.log("TOKEN MISMATCH: DB =", dbToken, " | REQ =", qrToken);
-        }
-
-        if (dbStatus.toLowerCase() !== 'active' || dbToken !== String(qrToken)) {
-            return res.status(400).json({
-                success: false,
-                status: 'fail',
-                message: "Attendance session is inactive or QR token is invalid."
-            });
-        }
-
-        // Server expiration check
-        if (new Date() > new Date(sessionRecord.expires_at)) {
-            console.log("SESSION EXPIRED IN DB:", sessionRecord.expires_at);
-            await pool.query("UPDATE AttendanceSessions SET status = 'Expired' WHERE id = ?", [sessionId]);
-            return res.status(400).json({
-                success: false,
-                status: 'fail',
-                message: 'Attendance session is inactive or QR token is invalid.'
-            });
-        }
-
-        // Duplicate scan check
+        // Check if attendance is already recorded
         const [existing] = await pool.query(
             'SELECT id FROM Attendance WHERE session_id = ? AND student_id = ?',
             [sessionId, student_id]
         );
 
         if (existing.length > 0) {
-            return res.status(409).json({ status: 'fail', message: 'Attendance already marked for this class session.' });
+            return res.status(409).json({
+                success: false,
+                status: 'fail',
+                message: `Attendance is already marked for ${session.subject_name}.`
+            });
         }
 
-        // Insert record
+        // Record Present Attendance
         await pool.query(
             'INSERT INTO Attendance (session_id, student_id, status, scanned_at) VALUES (?, ?, "Present", NOW())',
             [sessionId, student_id]
         );
 
-        // Auto notification
-        await pool.query(
-            `INSERT INTO Notifications (student_id, message, type)
-             VALUES (?, ?, 'success')`,
-            [student_id, `Attendance marked successfully as Present for ${session.subject_name}.`]
-        );
-
-        res.status(200).json({
+        return res.status(200).json({
+            success: true,
             status: 'success',
             message: `Attendance marked successfully for ${session.subject_name}!`
         });
+
     } catch (error) {
-        console.error('Mark Attendance Error:', error.message);
-        res.status(500).json({ status: 'error', message: 'Internal server error while marking attendance.' });
+        console.error('Attendance Mark Execution Error:', error);
+        return res.status(500).json({
+            success: false,
+            status: 'error',
+            message: 'Internal server error while recording attendance.'
+        });
     }
 };
 
@@ -244,7 +260,7 @@ exports.markAttendance = async (req, res) => {
  */
 exports.getAttendanceHistory = async (req, res) => {
     const student_id = req.user.id;
-    const { subject_id, type, month, year } = req.query;
+    const { subject_id, month, year } = req.query;
 
     try {
         let query = `
@@ -346,10 +362,6 @@ exports.getAttendanceAnalytics = async (req, res) => {
  * --------------------------------------------------------------------------
  */
 
-/**
- * Fetch Complete Student Profile
- * GET /api/student/profile
- */
 exports.getProfile = async (req, res) => {
     const student_id = req.user.id;
 
@@ -384,10 +396,6 @@ exports.getProfile = async (req, res) => {
     }
 };
 
-/**
- * Upload Student Profile Picture
- * POST /api/student/profile-pic
- */
 exports.updateProfilePic = async (req, res) => {
     const student_id = req.user.id;
 
@@ -411,10 +419,6 @@ exports.updateProfilePic = async (req, res) => {
     }
 };
 
-/**
- * Change Student Password
- * POST /api/student/change-password
- */
 exports.changePassword = async (req, res) => {
     const student_id = req.user.id;
     const { currentPassword, newPassword } = req.body;
@@ -443,7 +447,7 @@ exports.changePassword = async (req, res) => {
 
         res.status(200).json({
             status: 'success',
-            message: 'Password changed successfully.'
+            message: 'Password updated successfully.'
         });
     } catch (error) {
         console.error('Change Password Error:', error.message);
@@ -457,10 +461,6 @@ exports.changePassword = async (req, res) => {
  * --------------------------------------------------------------------------
  */
 
-/**
- * Submit Leave Application
- * POST /api/student/leaves
- */
 exports.applyLeave = async (req, res) => {
     const student_id = req.user.id;
     const { start_date, end_date, reason } = req.body;
@@ -477,9 +477,9 @@ exports.applyLeave = async (req, res) => {
         );
 
         await pool.query(
-            `INSERT INTO Notifications (student_id, message, type)
-             VALUES (?, ?, 'info')`,
-            [student_id, `Leave application submitted for period ${start_date} to ${end_date}. Status: Pending.`]
+            `INSERT INTO Notifications (student_id, user_id, user_role, title, message, type)
+             VALUES (?, ?, 'Student', 'Leave Application Submitted', ?, 'info')`,
+            [student_id, student_id, `Leave application submitted for period ${start_date} to ${end_date}. Status: Pending.`]
         );
 
         res.status(201).json({
@@ -492,10 +492,6 @@ exports.applyLeave = async (req, res) => {
     }
 };
 
-/**
- * Get Student Leave Applications History
- * GET /api/student/leaves
- */
 exports.getLeaveHistory = async (req, res) => {
     const student_id = req.user.id;
 
@@ -517,51 +513,91 @@ exports.getLeaveHistory = async (req, res) => {
         res.status(500).json({ status: 'error', message: 'Internal server error while fetching leave history.' });
     }
 };
+exports.getMyLeaves = exports.getLeaveHistory;
 
-/**
- * Get Student Notifications
- * GET /api/student/notifications
- */
 exports.getNotifications = async (req, res) => {
     const student_id = req.user.id;
 
-    try {
-        const [notifs] = await pool.query(
-            `SELECT id, message, type, is_read, created_at
-             FROM Notifications
-             WHERE student_id = ?
-             ORDER BY created_at DESC
-             LIMIT 20`,
-            [student_id]
-        );
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
-        const unreadCount = notifs.filter(n => !n.is_read).length;
+    try {
+        const [announcements] = await pool.query(`
+            SELECT a.id, a.title, a.message, a.type,
+                   COALESCE(a.type, 'info') AS priority,
+                   a.created_at,
+                   t.name AS faculty_name,
+                   s.name AS subject_name,
+                   s.code AS subject_code,
+                   sec.name AS section_name,
+                   'announcement' AS source
+            FROM Announcements a
+            LEFT JOIN Classes c ON a.class_id = c.id
+            LEFT JOIN Teachers t ON a.teacher_id = t.id
+            LEFT JOIN Subjects s ON c.subject_id = s.id
+            LEFT JOIN Sections sec ON c.section_id = sec.id
+            WHERE (
+                a.class_id IN (
+                    SELECT id FROM Classes 
+                    WHERE section_id = (SELECT section_id FROM Students WHERE id = ?)
+                       OR section_id IS NULL
+                       OR subject_id IN (SELECT id FROM Subjects WHERE course_id = (SELECT course_id FROM Students WHERE id = ?))
+                )
+                OR a.class_id IS NULL
+            )
+            ORDER BY a.created_at DESC
+            LIMIT 30
+        `, [student_id, student_id]);
+
+        const [systemNotifs] = await pool.query(`
+            SELECT n.id, n.title, n.message, n.type,
+                   COALESCE(n.type, 'info') AS priority,
+                   n.is_read, n.created_at,
+                   'Administration' AS faculty_name,
+                   'System Alert' AS subject_name,
+                   NULL AS subject_code,
+                   NULL AS section_name,
+                   'system' AS source
+            FROM Notifications n
+            WHERE n.student_id = ? OR (n.user_id = ? AND n.user_role = 'Student')
+            ORDER BY n.created_at DESC
+            LIMIT 20
+        `, [student_id, student_id]);
+
+        const combined = [...announcements, ...systemNotifs].sort(
+            (a, b) => new Date(b.created_at) - new Date(a.created_at)
+        );
 
         res.status(200).json({
             status: 'success',
+            success: true,
             data: {
-                notifications: notifs,
-                unreadCount
+                notifications: combined,
+                unreadCount: combined.length
             }
         });
     } catch (error) {
         console.error('Get Notifications Error:', error.message);
-        res.status(500).json({ status: 'error', message: 'Internal server error while fetching notifications.' });
+        res.status(500).json({ 
+            status: 'error', 
+            success: false, 
+            message: 'Internal server error while fetching notifications.',
+            details: error.message 
+        });
     }
 };
+exports.getStudentNotifications = exports.getNotifications;
 
-/**
- * Mark Notifications as Read
- * POST /api/student/notifications/read
- */
 exports.markNotificationsRead = async (req, res) => {
     const student_id = req.user.id;
 
     try {
-        await pool.query('UPDATE Notifications SET is_read = 1 WHERE student_id = ?', [student_id]);
+        await pool.query('UPDATE Notifications SET is_read = 1 WHERE student_id = ? OR (user_id = ? AND user_role = "Student")', [student_id, student_id]);
 
         res.status(200).json({
             status: 'success',
+            success: true,
             message: 'Notifications marked as read.'
         });
     } catch (error) {

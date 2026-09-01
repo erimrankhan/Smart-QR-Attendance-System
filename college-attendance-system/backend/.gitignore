@@ -1,3 +1,7 @@
+smart qr attendance system 
+git ignore 
+
 node_modules/
 .env
 *.log
+

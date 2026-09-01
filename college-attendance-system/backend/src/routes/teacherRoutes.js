@@ -36,7 +36,7 @@ const upload = multer({
     }
 });
 
-// Protect all routes with JWT verification and strict Teacher role authorization
+// Protect all routes
 router.use(verifyToken);
 router.use(authorizeRoles('Teacher'));
 
@@ -57,14 +57,16 @@ router.get('/class-roster/:class_id', teacherController.getClassRoster);
 router.get('/students-directory', teacherController.searchStudentsDirectory);
 router.get('/timetable', teacherController.getClassTimetable);
 
-// 4. Comprehensive Reports Engine
+// 4. Reports Engine
 router.get('/reports', teacherController.getAttendanceReports);
 
-// 5. Class Announcements Dispatcher
+// 5. Announcements
 router.post('/send-announcement', teacherController.sendClassAnnouncement);
+router.post('/announcements', teacherController.sendClassAnnouncement);
+router.post('/announcements/broadcast', teacherController.sendClassAnnouncement);
 router.get('/announcements', teacherController.getTeacherAnnouncements);
 
-// 6. Faculty Profile & Security
+// 6. Profile
 router.get('/profile', teacherController.getTeacherProfile);
 router.post('/profile-pic', upload.single('profile_pic'), teacherController.updateTeacherProfilePic);
 router.post('/change-password', teacherController.changeTeacherPassword);

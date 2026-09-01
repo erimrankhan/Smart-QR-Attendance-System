@@ -5,10 +5,194 @@
 const HOST_IP = (window.location.hostname && window.location.hostname !== '') ? window.location.hostname : 'localhost';
 const AUTH_API_URL = `http://${HOST_IP}:5000/api/auth`;
 
+// Faculty OTP Verification State
+let isFacultyEmailVerified = false;
+let facultyOtpCooldownTimer = null;
+let facultyOtpSecondsRemaining = 0;
+
 window.onload = async () => {
     await fetchDepartments();
+    initFacultyOtpHandlers();
     initRegistrationForm();
 };
+
+/**
+ * Initialize Faculty OTP Verification Handlers
+ */
+function initFacultyOtpHandlers() {
+    const emailInput = document.getElementById('email');
+    const sendOtpBtn = document.getElementById('sendFacultyOtpBtn');
+    const otpBox = document.getElementById('facultyOtpBox');
+    const otpInput = document.getElementById('facultyOtpInput');
+    const verifyOtpBtn = document.getElementById('verifyFacultyOtpBtn');
+    const otpStatusMsg = document.getElementById('facultyOtpStatus');
+    const changeEmailBtn = document.getElementById('changeFacultyEmailBtn');
+    const verifiedBadge = document.getElementById('facultyEmailVerifiedBadge');
+
+    // 1. Cooldown Timer Handler
+    function startFacultyOtpCooldown(duration = 60) {
+        facultyOtpSecondsRemaining = duration;
+        if (sendOtpBtn) {
+            sendOtpBtn.disabled = true;
+            sendOtpBtn.innerHTML = `<i class="fa-solid fa-clock"></i> <span>Resend (${facultyOtpSecondsRemaining}s)</span>`;
+        }
+
+        clearInterval(facultyOtpCooldownTimer);
+        facultyOtpCooldownTimer = setInterval(() => {
+            facultyOtpSecondsRemaining--;
+            if (facultyOtpSecondsRemaining <= 0) {
+                clearInterval(facultyOtpCooldownTimer);
+                if (sendOtpBtn && !isFacultyEmailVerified) {
+                    sendOtpBtn.disabled = false;
+                    sendOtpBtn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> <span>Resend OTP</span>`;
+                }
+            } else {
+                if (sendOtpBtn && !isFacultyEmailVerified) {
+                    sendOtpBtn.innerHTML = `<i class="fa-solid fa-clock"></i> <span>Resend (${facultyOtpSecondsRemaining}s)</span>`;
+                }
+            }
+        }, 1000);
+    }
+
+    // 2. Send OTP Click
+    if (sendOtpBtn) {
+        sendOtpBtn.addEventListener('click', async () => {
+            const emailVal = emailInput ? emailInput.value.trim() : '';
+
+            if (!emailVal) {
+                showToast('Please enter your institutional email address first.', 'warning');
+                if (emailInput) emailInput.focus();
+                return;
+            }
+
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(emailVal)) {
+                showToast('Please enter a valid email address format.', 'error');
+                if (emailInput) emailInput.focus();
+                return;
+            }
+
+            sendOtpBtn.disabled = true;
+            sendOtpBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Sending...</span>`;
+
+            try {
+                const response = await fetch(`${AUTH_API_URL}/send-otp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: emailVal, role: 'faculty' })
+                });
+                const resData = await response.json();
+
+                if (response.ok && resData.status === 'success') {
+                    showToast(resData.message || `OTP sent to ${emailVal}`);
+
+                    if (otpBox) {
+                        otpBox.style.display = 'flex';
+                        otpBox.classList.add('active');
+                    }
+                    if (emailInput) emailInput.readOnly = true;
+                    if (changeEmailBtn) changeEmailBtn.style.display = 'inline-block';
+                    if (otpInput) {
+                        otpInput.value = '';
+                        otpInput.focus();
+                    }
+                    if (otpStatusMsg) {
+                        otpStatusMsg.innerHTML = `<i class="fa-solid fa-paper-plane" style="color: var(--accent-teal);"></i> Code sent to <strong style="color: var(--text-primary);">${emailVal}</strong> (valid 10m)`;
+                    }
+
+                    startFacultyOtpCooldown(60);
+                } else {
+                    showToast(resData.message || 'Failed to send OTP.', 'error');
+                    sendOtpBtn.disabled = false;
+                    sendOtpBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Send OTP</span>`;
+                }
+            } catch (err) {
+                console.error('Send OTP Network Error:', err);
+                showToast('Network error while requesting verification OTP.', 'error');
+                sendOtpBtn.disabled = false;
+                sendOtpBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Send OTP</span>`;
+            }
+        });
+    }
+
+    // 3. Verify OTP Click
+    if (verifyOtpBtn) {
+        verifyOtpBtn.addEventListener('click', async () => {
+            const emailVal = emailInput ? emailInput.value.trim() : '';
+            const otpVal = otpInput ? otpInput.value.trim() : '';
+
+            if (!otpVal || otpVal.length < 4) {
+                showToast('Please enter the 6-digit OTP code.', 'warning');
+                if (otpInput) otpInput.focus();
+                return;
+            }
+
+            verifyOtpBtn.disabled = true;
+            verifyOtpBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Verifying...</span>`;
+
+            try {
+                const response = await fetch(`${AUTH_API_URL}/verify-otp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: emailVal, otp: otpVal })
+                });
+                const resData = await response.json();
+
+                if (response.ok && resData.status === 'success') {
+                    isFacultyEmailVerified = true;
+                    clearInterval(facultyOtpCooldownTimer);
+
+                    showToast('Official email verified successfully!', 'success');
+
+                    if (verifiedBadge) verifiedBadge.style.display = 'inline-flex';
+                    if (sendOtpBtn) sendOtpBtn.style.display = 'none';
+                    if (otpBox) otpBox.style.display = 'none';
+                    if (emailInput) {
+                        emailInput.readOnly = true;
+                        emailInput.style.borderColor = '#10b981';
+                    }
+                } else {
+                    showToast(resData.message || 'Invalid or expired OTP code.', 'error');
+                    verifyOtpBtn.disabled = false;
+                    verifyOtpBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span>Verify OTP</span>`;
+                    if (otpInput) {
+                        otpInput.style.borderColor = '#f43f5e';
+                        otpInput.focus();
+                    }
+                }
+            } catch (err) {
+                console.error('Verify OTP Network Error:', err);
+                showToast('Network error during OTP verification.', 'error');
+                verifyOtpBtn.disabled = false;
+                verifyOtpBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span>Verify OTP</span>`;
+            }
+        });
+    }
+
+    // 4. Change Email Click
+    if (changeEmailBtn) {
+        changeEmailBtn.addEventListener('click', () => {
+            clearInterval(facultyOtpCooldownTimer);
+            isFacultyEmailVerified = false;
+            if (emailInput) {
+                emailInput.readOnly = false;
+                emailInput.style.borderColor = '';
+                emailInput.focus();
+            }
+            if (otpBox) {
+                otpBox.style.display = 'none';
+                otpBox.classList.remove('active');
+            }
+            if (sendOtpBtn) {
+                sendOtpBtn.disabled = false;
+                sendOtpBtn.style.display = 'inline-flex';
+                sendOtpBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Send OTP</span>`;
+            }
+            if (verifiedBadge) verifiedBadge.style.display = 'none';
+            if (otpInput) otpInput.value = '';
+        });
+    }
+}
 
 /**
  * Fetch Public Departments for Dropdown
@@ -47,6 +231,21 @@ function initRegistrationForm() {
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        // 1. Email OTP Verification Guard
+        if (!isFacultyEmailVerified) {
+            showToast('Please verify your official email address via OTP first.', 'warning');
+            const otpBox = document.getElementById('facultyOtpBox');
+            const sendOtpBtn = document.getElementById('sendFacultyOtpBtn');
+            const otpInput = document.getElementById('facultyOtpInput');
+
+            if (!otpBox || !otpBox.classList.contains('active')) {
+                if (sendOtpBtn) sendOtpBtn.click();
+            } else if (otpInput) {
+                otpInput.focus();
+            }
+            return;
+        }
 
         const name = document.getElementById('name').value.trim();
         const employee_id = document.getElementById('employee_id') ? document.getElementById('employee_id').value.trim() : '';

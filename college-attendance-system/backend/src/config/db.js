@@ -7,9 +7,15 @@ const pool = mysql.createPool({
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || 'sql123',
     database: process.env.DB_NAME || 'college_attendance_system',
+    timezone: '+05:30', // IST Timezone support fix
+    dateStrings: true,  // Prevents Node.js from shifting dates to UTC
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
+    queueLimit: 0,
+    // Aiven Cloud MySQL requires SSL connection
+    ssl: process.env.DB_HOST && process.env.DB_HOST !== 'localhost' ? {
+        rejectUnauthorized: false
+    } : false
 });
 
 // Test connection on startup

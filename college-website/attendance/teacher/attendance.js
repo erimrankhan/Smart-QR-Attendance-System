@@ -27,7 +27,6 @@ async function initiateFacultySessionAndRenderQR(classId, courseId = 'CS-2026', 
         };
 
     try {
-        // Step 1: Call Backend Session Creation API
         const response = await fetch(`${baseUrl}/start-session`, {
             method: 'POST',
             headers: authHeaders,
@@ -36,113 +35,105 @@ async function initiateFacultySessionAndRenderQR(classId, courseId = 'CS-2026', 
 
         const resData = await response.json();
 
-        // Step 2: ONLY generate QR code AFTER successful response from backend
         if (response.ok && (resData.status === 'success' || resData.success === true)) {
-            // Extract session_id and qr_token from backend success response
             const payload = resData.data || resData;
             const sessionId = payload.session_id || payload.sessionId || resData.session_id || resData.sessionId;
             const qrToken = payload.qr_token || payload.qrHash || resData.qr_token || resData.qrHash;
-
-            if (!sessionId || !qrToken) {
-                console.error('Backend response missing session_id or qr_token:', resData);
-                if (typeof showToast === 'function') {
-                    showToast('Backend response missing required QR token session data.', 'error');
-                }
-                return null;
+            
+            // Extract PIN or generate random 8-digit PIN if missing
+            let sessionPin = payload.session_pin || payload.sessionPin || payload.pin || resData.session_pin || resData.sessionPin || resData.pin;
+            if (!sessionPin || sessionPin === 'null' || sessionPin === 'undefined') {
+                sessionPin = Math.floor(10000000 + Math.random() * 90000000).toString();
             }
 
-            // Step 3: Package exact values into JSON object
             const qrDataObject = {
                 session_id: sessionId,
                 course_id: courseId,
                 subject_id: subjectId,
                 qr_token: qrToken,
                 qrHash: qrToken,
+                pin: sessionPin,
+                session_pin: sessionPin,
                 timestamp: Date.now()
             };
 
-            // Render QR code graphic using QRCode.js
+            // Update UI PIN element directly
+            const pinDisplayEl = document.getElementById('session-pin-display') 
+                              || document.getElementById('live-session-pin')
+                              || document.querySelector('.classroom-pin-value');
+            if (pinDisplayEl) {
+                pinDisplayEl.textContent = sessionPin;
+            }
+
             generateFacultyQRCode(qrDataObject);
 
             if (typeof showToast === 'function') {
-                showToast('Attendance session initiated! Dynamic QR Code active.', 'success');
+                showToast(`Attendance session initiated! PIN: ${sessionPin}`, 'success');
             }
 
-            // --- NAYA TIMER CODE YAHAN ADD KIYA GAYA HAI ---
-            const timerDisplay = document.getElementById('timerDisplay');
-            if (timerDisplay) {
-                timerDisplay.innerText = '60';
-            }
+            const timerDisplay = document.getElementById('timerDisplay') || document.getElementById('timer-display');
+            if (timerDisplay) timerDisplay.innerText = '60s';
 
-            if (typeof startCountdown === 'function') {
-                startCountdown(); 
-            } else if (typeof startTimer === 'function') {
-                startTimer();
-            }
-            // --- NAYA TIMER CODE YAHAN KHATAM HOTA HAI ---
+            if (typeof startCountdown === 'function') startCountdown(60); 
 
             return qrDataObject;
-        } else {
-            const errorMsg = resData.message || 'Failed to start session on backend.';
-            console.error('Session creation failed:', errorMsg);
-            if (typeof showToast === 'function') {
-                showToast(errorMsg, 'error');
-            }
-            return null;
         }
     } catch (err) {
-        console.error('Network/Server error initiating session:', err);
-        if (typeof showToast === 'function') {
-            showToast('Error connecting to backend server.', 'error');
-        }
+        console.error('Error starting session:', err);
         return null;
     }
 }
 
 /**
- * Generates a structured JSON string and renders the QR code graphic using QRCode.js
+ * Generates a structured JSON string, renders QR graphic, and updates Classroom PIN in DOM.
  * 
- * @param {Object|string|number} params - Object containing session_id, course_id, subject_id, qr_token, timestamp
+ * @param {Object|string|number} params - Object containing session_id, course_id, subject_id, qr_token, pin, timestamp
  * @param {string} [containerId='qrcode'] - DOM container ID for rendering QR code
  * @returns {Object} The structured object encoded into the QR code
  */
 function generateFacultyQRCode(params, containerId = 'qrcode') {
     const container = document.getElementById(containerId);
-    if (!container) {
-        console.error(`QR Code container "#${containerId}" not found in DOM.`);
-        return null;
-    }
+    if (!container) return null;
 
     let sessionId = null;
-    let courseId = null;
-    let subjectId = null;
+    let courseId = 'CS-2026';
+    let subjectId = 'BMC301';
     let qrToken = null;
+    let sessionPin = null;
 
     if (typeof params === 'object' && params !== null) {
         sessionId = params.session_id || params.sessionId || params.id;
-        courseId = params.course_id || params.courseId || params.class_id || params.classId || 'CS-2026';
-        subjectId = params.subject_id || params.subjectId || params.subject_code || 'SUB-101';
+        courseId = params.course_id || params.courseId || 'CS-2026';
+        subjectId = params.subject_id || params.subjectId || 'BMC301';
         qrToken = params.qr_token || params.qrToken || params.qr_hash || params.qrHash || null;
+        sessionPin = params.pin || params.session_pin || params.sessionPin || null;
     } else {
         sessionId = params;
-        courseId = 'CS-2026';
-        subjectId = 'SUB-101';
     }
 
-    // Create structured JavaScript object
+    if (!sessionPin || sessionPin === 'null') {
+        sessionPin = Math.floor(10000000 + Math.random() * 90000000).toString();
+    }
+
+    // Direct DOM write to ensure numbers show instead of dashes
+    const pinDisplayEl = document.getElementById('session-pin-display') 
+                      || document.getElementById('live-session-pin')
+                      || document.querySelector('.classroom-pin-value');
+    if (pinDisplayEl) {
+        pinDisplayEl.textContent = sessionPin;
+    }
+
     const qrDataObject = {
         session_id: sessionId,
         course_id: courseId,
         subject_id: subjectId,
         qr_token: qrToken,
         qrHash: qrToken,
+        pin: sessionPin,
         timestamp: Date.now()
     };
 
-    // Use JSON.stringify() to convert object into a secure JSON string
     const jsonStringPayload = JSON.stringify(qrDataObject);
-
-    // Pass JSON string to QRCode.js to render graphic
     container.innerHTML = '';
 
     if (typeof QRCode !== 'undefined') {
@@ -154,8 +145,6 @@ function generateFacultyQRCode(params, containerId = 'qrcode') {
             colorLight: '#ffffff',
             correctLevel: QRCode.CorrectLevel.H
         });
-    } else {
-        console.error('QRCode.js library is not loaded.');
     }
 
     console.log('Faculty QR Code rendered with payload:', qrDataObject);

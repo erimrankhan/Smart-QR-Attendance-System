@@ -120,7 +120,8 @@ async function submitAttendanceToBackend(payload) {
         session_id: payload.session_id || payload.sessionId,
         qrToken: payload.qrToken || payload.qrHash,
         qr_token: payload.qr_token || payload.qrToken || payload.qrHash,
-        qrHash: payload.qrHash || payload.qrToken
+        qrHash: payload.qrHash || payload.qrToken,
+        pin: payload.pin || payload.session_pin || payload.sessionPin
     };
 
     console.log("SENDING TO BACKEND:", requestBody);

@@ -21,11 +21,12 @@
     <link rel="stylesheet" href="../shared/styles.css">
     <link rel="stylesheet" href="dashboard.css">
 </head>
-    <!-- Mobile Drawer Backdrop Overlay -->
-    <div class="mobile-overlay" id="mobileOverlay"></div>
+<body>
+    <!-- Dark Translucent Backdrop Overlay -->
+    <div class="portal-backdrop sidebar-backdrop mobile-overlay" id="portalBackdrop"></div>
 
     <div class="app-container">
-        <!-- Sidebar Navigation -->
+        <!-- Slide-In Navigation Drawer (Hidden Off-Screen By Default) -->
         <aside class="sidebar" id="sidebar">
             <div class="brand">
                 <div class="brand-logo">
@@ -35,6 +36,10 @@
                     <h2>Smart QR</h2>
                     <p>Faculty Portal</p>
                 </div>
+                <!-- Close Drawer Button -->
+                <button class="portal-sidebar-close sidebar-close-btn mobile-sidebar-close" id="portalSidebarClose" title="Close Navigation Menu" aria-label="Close Navigation Menu">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
 
             <nav class="nav-menu">
@@ -69,13 +74,15 @@
             </nav>
         </aside>
 
-        <!-- Main Content Area -->
+        <!-- Main Content Area (100% Full Width) -->
         <main class="main-content">
             <!-- Top Header (Topbar) -->
             <header class="top-header">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <button class="mobile-toggle-btn" id="mobileMenuToggle" title="Toggle Navigation Menu">
-                        <i class="fa-solid fa-bars"></i>
+                    <button class="portal-sidebar-toggle sidebar-toggle-btn hamburger-btn menu-toggle mobile-toggle-btn" id="portalSidebarToggle" aria-label="Toggle Navigation" title="Toggle Navigation Menu">
+                        <span class="bar"></span>
+                        <span class="bar"></span>
+                        <span class="bar"></span>
                     </button>
                     <div class="page-title">
                         <h1 id="view-title">Faculty Dashboard</h1>
@@ -208,12 +215,25 @@
                             <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--glass-border); padding: 24px; border-radius: var(--radius-lg); text-align: center;">
                                 <div id="qrcode" style="display: flex; justify-content: center; background: white; padding: 16px; border-radius: 14px; margin-bottom: 16px;"></div>
                                 
+                                <!-- 8-Digit Dynamic PIN Fallback Box for Backbenchers -->
+                                <div id="classroom-pin-container" style="background: rgba(13, 148, 136, 0.12); border: 1px solid rgba(13, 148, 136, 0.35); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; text-align: center;">
+                                    <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--accent-teal); letter-spacing: 0.5px; margin-bottom: 4px;">
+                                        <i class="fa-solid fa-key" style="margin-right: 4px;"></i> Classroom PIN (For Backbenchers)
+                                    </div>
+                                    <div id="session-pin-display" style="font-size: 28px; font-weight: 900; font-family: monospace; letter-spacing: 5px; color: #38bdf8; text-shadow: 0 0 12px rgba(56, 189, 248, 0.4);">
+                                        --------
+                                    </div>
+                                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                                        Students far from screen can enter this PIN directly.
+                                    </div>
+                                </div>
+
                                 <div style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 4px;">Dynamic Session Timer:</div>
                                 <div id="timer-display" style="font-size: 32px; font-weight: 800; color: var(--accent-rose); margin-bottom: 16px;">60s</div>
 
                                 <div style="display: flex; flex-direction: column; gap: 10px;">
                                     <button class="btn btn-secondary" id="regenerate-qr-btn" onclick="regenerateActiveQR()">
-                                        <i class="fa-solid fa-rotate"></i> Regenerate Dynamic QR
+                                        <i class="fa-solid fa-rotate"></i> Regenerate Dynamic QR & PIN
                                     </button>
                                     <button class="btn btn-primary" id="close-session-btn" style="background: var(--accent-rose);">
                                         <i class="fa-solid fa-stop"></i> End Attendance Session

@@ -19,4 +19,8 @@ router.post('/teacher/register', authController.teacherRegister);
 router.post('/faculty/register', authController.facultyRegister);
 router.post('/student/register', authController.studentRegister);
 
+// Email OTP Verification Routes
+router.post('/send-otp', authController.sendOtp);
+router.post('/verify-otp', authController.verifyOtp);
+
 module.exports = router;

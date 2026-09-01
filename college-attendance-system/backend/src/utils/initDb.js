@@ -5,12 +5,15 @@ async function initDb() {
     try {
         console.log('🔄 Initializing MySQL Database & 14 Core Tables...');
 
-        // 1. Create Connection without database selected
+        // 1. Create Connection without database selected (with SSL support for Cloud DBs)
+        const isLocal = !process.env.DB_HOST || process.env.DB_HOST === 'localhost' || process.env.DB_HOST === '127.0.0.1';
+        
         const connection = await mysql.createConnection({
             host: process.env.DB_HOST || 'localhost',
             port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 3306,
             user: process.env.DB_USER || 'root',
-            password: process.env.DB_PASSWORD || 'sql123'
+            password: process.env.DB_PASSWORD || '',
+            ssl: isLocal ? false : { rejectUnauthorized: false }
         });
 
         const dbName = process.env.DB_NAME || 'college_attendance_system';
@@ -20,6 +23,9 @@ async function initDb() {
 
         // 2. Connect using pool
         const pool = require('../config/db');
+
+        // Disable Foreign Key checks before creating tables
+        await pool.query('SET FOREIGN_KEY_CHECKS = 0;');
 
         // 1. Departments
         await pool.query(`
@@ -59,47 +65,8 @@ async function initDb() {
         `);
         try {
             await pool.query("ALTER TABLE Courses ADD COLUMN duration_years INT NOT NULL DEFAULT 4 AFTER code");
-        } catch (e) {
-            // Column already exists
-        }
-        console.log('✅ Courses table ready.');
-
-        // 14. Notifications
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS Notifications (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT DEFAULT NULL,
-                user_role VARCHAR(50) DEFAULT 'Student',
-                student_id INT DEFAULT NULL,
-                title VARCHAR(150) DEFAULT 'Notification',
-                message TEXT NOT NULL,
-                type VARCHAR(30) DEFAULT 'info',
-                is_read TINYINT DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (student_id) REFERENCES Students(id) ON DELETE CASCADE
-            );
-        `);
-        try {
-            await pool.query("ALTER TABLE Notifications ADD COLUMN user_id INT DEFAULT NULL, ADD COLUMN user_role VARCHAR(50) DEFAULT 'Student', ADD COLUMN title VARCHAR(150) DEFAULT 'Notification', ADD COLUMN type VARCHAR(30) DEFAULT 'info', ADD COLUMN is_read TINYINT DEFAULT 0");
         } catch (e) {}
-        console.log('✅ Notifications table ready.');
-
-        // 15. SystemSettings
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS SystemSettings (
-                id INT PRIMARY KEY DEFAULT 1,
-                college_name VARCHAR(255) DEFAULT 'Smart Institute of Technology & Science',
-                academic_session VARCHAR(100) DEFAULT '2025 - 2026',
-                qr_expiry_seconds INT DEFAULT 60,
-                backup_auto_enabled BOOLEAN DEFAULT TRUE,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            );
-        `);
-        await pool.query(`
-            INSERT IGNORE INTO SystemSettings (id, college_name, academic_session, qr_expiry_seconds) 
-            VALUES (1, 'Smart Institute of Technology & Science', '2025 - 2026', 60);
-        `);
-        console.log('✅ SystemSettings table ready.');
+        console.log('✅ Courses table ready.');
 
         // 4. Semesters
         await pool.query(`
@@ -143,12 +110,9 @@ async function initDb() {
                 FOREIGN KEY (semester_id) REFERENCES Semesters(id) ON DELETE SET NULL
             );
         `);
-        // Migration: add semester_id and type columns if they were not created initially
         try {
             await pool.query("ALTER TABLE Subjects ADD COLUMN semester_id INT DEFAULT NULL, ADD COLUMN type ENUM('Theory', 'Practical') DEFAULT 'Theory'");
-        } catch (e) {
-            // Columns already exist
-        }
+        } catch (e) {}
         console.log('✅ Subjects table ready.');
 
         // 7. Teachers
@@ -238,6 +202,7 @@ async function initDb() {
                 class_id INT NOT NULL,
                 teacher_id INT NOT NULL,
                 qr_code_hash VARCHAR(255) UNIQUE NOT NULL,
+                session_pin VARCHAR(8) NULL,
                 status ENUM('Active', 'Closed', 'Expired') DEFAULT 'Active',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 expires_at DATETIME NOT NULL,
@@ -266,14 +231,20 @@ async function initDb() {
         await pool.query(`
             CREATE TABLE IF NOT EXISTS Notifications (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT NOT NULL,
-                user_role ENUM('Admin', 'Teacher', 'Student') NOT NULL,
-                title VARCHAR(150) NOT NULL,
+                user_id INT DEFAULT NULL,
+                user_role VARCHAR(50) DEFAULT 'Student',
+                student_id INT DEFAULT NULL,
+                title VARCHAR(150) DEFAULT 'Notification',
                 message TEXT NOT NULL,
+                type VARCHAR(30) DEFAULT 'info',
                 is_read TINYINT DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (student_id) REFERENCES Students(id) ON DELETE CASCADE
             );
         `);
+        try {
+            await pool.query("ALTER TABLE Notifications ADD COLUMN user_id INT DEFAULT NULL, ADD COLUMN user_role VARCHAR(50) DEFAULT 'Student', ADD COLUMN title VARCHAR(150) DEFAULT 'Notification', ADD COLUMN type VARCHAR(30) DEFAULT 'info', ADD COLUMN is_read TINYINT DEFAULT 0");
+        } catch (e) {}
         console.log('✅ Notifications table ready.');
 
         // 14. AuditLogs
@@ -290,6 +261,23 @@ async function initDb() {
         `);
         console.log('✅ AuditLogs table ready.');
 
+        // 15. SystemSettings
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS SystemSettings (
+                id INT PRIMARY KEY DEFAULT 1,
+                college_name VARCHAR(255) DEFAULT 'Smart Institute of Technology & Science',
+                academic_session VARCHAR(100) DEFAULT '2025 - 2026',
+                qr_expiry_seconds INT DEFAULT 60,
+                backup_auto_enabled BOOLEAN DEFAULT TRUE,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            );
+        `);
+        await pool.query(`
+            INSERT IGNORE INTO SystemSettings (id, college_name, academic_session, qr_expiry_seconds) 
+            VALUES (1, 'Smart Institute of Technology & Science', '2025 - 2026', 60);
+        `);
+        console.log('✅ SystemSettings table ready.');
+
         // 16. LeaveRequests
         await pool.query(`
             CREATE TABLE IF NOT EXISTS LeaveRequests (
@@ -305,6 +293,8 @@ async function initDb() {
                 FOREIGN KEY (student_id) REFERENCES Students(id) ON DELETE CASCADE
             );
         `);
+        console.log('✅ LeaveRequests table ready.');
+
         // 17. StudyMaterials
         await pool.query(`
             CREATE TABLE IF NOT EXISTS StudyMaterials (
@@ -338,6 +328,9 @@ async function initDb() {
             );
         `);
         console.log('✅ Announcements table ready.');
+
+        // Re-enable Foreign Key checks after creation
+        await pool.query('SET FOREIGN_KEY_CHECKS = 1;');
 
         console.log('🎉 Database initialization complete!');
         process.exit(0);

@@ -2,17 +2,36 @@
  * Smart QR Attendance System - Admin Portal Logic (Full Suite)
  */
 
-const API_BASE_URL = 'http://127.0.0.1:5000/api/admin';
+window.ADMIN_API_BASE_URL = `${window.API_BASE_URL || `http://${window.location.hostname || 'localhost'}:5000`}/api/admin`;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Dismiss any hanging loaders immediately on page entrance
+    if (typeof hideLoading === 'function') hideLoading();
+    const hungLoader = document.getElementById('global-loader');
+    if (hungLoader) {
+        hungLoader.classList.remove('active');
+        hungLoader.style.display = 'none';
+        hungLoader.style.pointerEvents = 'none';
+    }
+
     checkAdminAuth();
     initTheme();
-    loadDashboardSummary();
     initNavigation();
     initFormSubmitListeners();
     initSubjectCourseChangeListener();
-    fetchPendingFaculty();
-    fetchPendingApprovals();
+    initStudentFormCascadingListeners();
+
+    try {
+        await Promise.allSettled([
+            loadDashboardSummary(),
+            fetchPendingFaculty(),
+            fetchPendingApprovals()
+        ]);
+    } catch (err) {
+        console.warn('Initial admin data load warning:', err);
+    } finally {
+        if (typeof hideLoading === 'function') hideLoading();
+    }
 });
 
 /**
@@ -52,7 +71,7 @@ function updateAdminTopbarAvatar(photoUrl, name) {
     if (!avatarEl) return;
 
     if (photoUrl) {
-        const fullUrl = photoUrl.startsWith('http') ? photoUrl : `http://192.168.0.109:5000${photoUrl}`;
+        const fullUrl = photoUrl.startsWith('http') ? photoUrl : `${window.SERVER_URL || ''}${photoUrl}`;
         avatarEl.innerHTML = `<img src="${fullUrl}" class="avatar-img" alt="${name || 'Admin'}">`;
     } else {
         avatarEl.textContent = 'A';
@@ -60,15 +79,19 @@ function updateAdminTopbarAvatar(photoUrl, name) {
 }
 
 function getAuthHeaders() {
-    const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
-    return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+    const rawToken = localStorage.getItem('adminToken') || localStorage.getItem('token');
+    const token = (rawToken && rawToken !== 'null' && rawToken !== 'undefined') ? rawToken.trim() : '';
+    const headers = {
+        'Content-Type': 'application/json'
     };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
 }
 
 function redirectToLogin() {
-    window.location.href = '/attendance/admin/login.html';
+    window.location.href = 'login.html';
 }
 
 function initTheme() {
@@ -98,38 +121,114 @@ function updateThemeIcon(theme) {
 }
 
 /**
- * 2. NAVIGATION & SPA VIEW SWITCHER
+ * 2. NAVIGATION & SPA VIEW SWITCHER (SLIDE-IN DRAWER)
  */
+function initPortalDrawer() {
+    const sidebar = document.querySelector('.sidebar') || document.getElementById('sidebar');
+    let backdrop = document.getElementById('portalBackdrop') || document.getElementById('sidebarBackdrop') || document.querySelector('.portal-backdrop') || document.getElementById('mobileOverlay');
+
+    if (!backdrop) {
+        backdrop = document.createElement('div');
+        backdrop.id = 'portalBackdrop';
+        backdrop.className = 'portal-backdrop';
+        document.body.appendChild(backdrop);
+    }
+
+    function toggleSidebar(e) {
+        if (e && e.preventDefault) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        if (sidebar) {
+            sidebar.classList.toggle('drawer-open');
+            sidebar.classList.toggle('show-sidebar');
+            sidebar.classList.toggle('active');
+            sidebar.classList.toggle('open');
+        }
+        if (backdrop) {
+            backdrop.classList.toggle('visible');
+            backdrop.classList.toggle('active');
+            backdrop.classList.toggle('open');
+        }
+        const isOpen = sidebar && (sidebar.classList.contains('drawer-open') || sidebar.classList.contains('active') || sidebar.classList.contains('open'));
+        document.body.style.overflow = isOpen ? 'hidden' : '';
+    }
+    window.toggleSidebar = toggleSidebar;
+    window.toggleMobileMenu = toggleSidebar;
+
+    function openSidebar() {
+        if (sidebar) {
+            sidebar.classList.add('drawer-open', 'show-sidebar', 'active', 'open');
+        }
+        if (backdrop) {
+            backdrop.classList.add('visible', 'active', 'open');
+        }
+        document.body.style.overflow = 'hidden';
+    }
+    window.openSidebar = openSidebar;
+
+    function closeSidebar(e) {
+        if (e && e.preventDefault) e.preventDefault();
+        if (sidebar) {
+            sidebar.classList.remove('drawer-open', 'show-sidebar', 'active', 'open');
+        }
+        if (backdrop) {
+            backdrop.classList.remove('visible', 'active', 'open');
+        }
+        document.body.style.overflow = '';
+    }
+    window.closeSidebar = closeSidebar;
+    window.closeMobileMenu = closeSidebar;
+
+    // Handle all hamburger and close button variations via robust event delegation
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('#portalSidebarToggle, #sidebarToggleBtn, #hamburgerBtn, #mobileMenuToggle, .portal-sidebar-toggle, .menu-toggle, .hamburger-btn, .sidebar-toggle-btn');
+        if (btn) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleSidebar();
+            return;
+        }
+
+        const closeBtn = e.target.closest('#portalSidebarClose, #sidebarCloseBtn, #mobileSidebarClose, .portal-sidebar-close, .sidebar-close-btn, .mobile-sidebar-close');
+        if (closeBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeSidebar();
+            return;
+        }
+    });
+
+    // Close when tapping backdrop
+    backdrop.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeSidebar();
+    });
+
+    // Keyboard ESC key support to close drawer
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' || e.key === 'Esc') {
+            closeSidebar();
+        }
+    });
+}
+
 function initNavigation() {
-    const sidebar = document.getElementById('sidebar');
-    const mobileToggle = document.getElementById('mobileMenuToggle');
-    const mobileOverlay = document.getElementById('mobileOverlay');
-
-    const toggleMobileMenu = () => {
-        if (sidebar) sidebar.classList.toggle('open');
-        if (mobileOverlay) mobileOverlay.classList.toggle('active');
-    };
-
-    const closeMobileMenu = () => {
-        if (sidebar) sidebar.classList.remove('open');
-        if (mobileOverlay) mobileOverlay.classList.remove('active');
-    };
-
-    if (mobileToggle) mobileToggle.addEventListener('click', toggleMobileMenu);
-    if (mobileOverlay) mobileOverlay.addEventListener('click', closeMobileMenu);
+    initPortalDrawer();
 
     const navItems = document.querySelectorAll('.nav-item[data-view]');
     navItems.forEach(item => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
             const viewId = item.getAttribute('data-view');
-            closeMobileMenu();
+            if (typeof window.closeSidebar === 'function') window.closeSidebar();
             switchView(viewId);
         });
     });
 
     const handleLogout = (e) => {
         if (e) e.preventDefault();
+        if (typeof window.closeSidebar === 'function') window.closeSidebar();
         
         if (typeof showConfirmModal === 'function') {
             showConfirmModal(
@@ -206,6 +305,7 @@ function switchView(viewId) {
     } else if (viewId === 'students-view') {
         if (titleEl) titleEl.textContent = 'Student Registry';
         if (subtitleEl) subtitleEl.textContent = 'Enroll students, reset passwords, and toggle account status';
+        fetchStudentFormData();
         fetchStudentDepartmentFilterOptions();
         fetchStudents();
     } else if (viewId === 'assignments-view') {
@@ -235,11 +335,17 @@ function switchView(viewId) {
  */
 async function loadDashboardSummary() {
     try {
-        const response = await fetch(`${API_BASE_URL}/dashboard-stats`, { headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/dashboard-stats`, { headers: getAuthHeaders() });
+        if (!response.ok && (response.status === 401 || response.status === 403)) {
+            console.warn('Admin session expired or unauthorized.');
+            redirectToLogin();
+            return;
+        }
+
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
-            const { totalStudents, totalTeachers, totalDepartments, activeClasses, todayAttendance, overallPercentage } = resData.data;
+            const { totalStudents, totalTeachers, totalDepartments, activeClasses, todayAttendance, overallPercentage } = resData.data || {};
 
             const stEl = document.getElementById('dash-total-students');
             const tcEl = document.getElementById('dash-total-teachers');
@@ -248,15 +354,17 @@ async function loadDashboardSummary() {
             const tdEl = document.getElementById('dash-today-attendance');
             const ovEl = document.getElementById('dash-overall-pct');
 
-            if (stEl) stEl.textContent = totalStudents;
-            if (tcEl) tcEl.textContent = totalTeachers;
-            if (dpEl) dpEl.textContent = totalDepartments;
-            if (clEl) clEl.textContent = activeClasses;
+            if (stEl) stEl.textContent = totalStudents || 0;
+            if (tcEl) tcEl.textContent = totalTeachers || 0;
+            if (dpEl) dpEl.textContent = totalDepartments || 0;
+            if (clEl) clEl.textContent = activeClasses || 0;
             if (tdEl) tdEl.textContent = `${todayAttendance || 0} Scans`;
             if (ovEl) ovEl.textContent = `${overallPercentage || 100}%`;
         }
     } catch (err) {
         console.error('Error loading dashboard summary:', err);
+    } finally {
+        if (typeof hideLoading === 'function') hideLoading();
     }
 }
 
@@ -269,7 +377,7 @@ async function fetchDepartments() {
     const teacherDeptSelect = document.getElementById('teacher-dept-select');
 
     try {
-        const response = await fetch(`${API_BASE_URL}/departments`, { headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/departments`, { headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -309,7 +417,7 @@ async function deleteDepartment(id) {
     if (!confirm('Are you sure you want to delete this department?')) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/departments/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/departments/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -332,7 +440,7 @@ async function fetchCourses() {
     if (!tbody) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/courses`, { headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/courses`, { headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -395,7 +503,7 @@ async function deleteCourse(id) {
     if (!confirm('Are you sure you want to delete this course program?')) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/courses/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/courses/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -418,15 +526,13 @@ async function fetchSubjectFormData() {
     const semesterSelect = document.getElementById('subject-semester-select');
 
     try {
-        // 1. Fetch Departments
-        const deptResponse = await fetch(`${API_BASE_URL}/departments`, { headers: getAuthHeaders() });
+        const deptResponse = await fetch(`${window.ADMIN_API_BASE_URL}/departments`, { headers: getAuthHeaders() });
         const deptData = await deptResponse.json();
         if (deptResponse.ok && deptData.status === 'success' && deptSelect) {
             deptSelect.innerHTML = '<option value="">Select Department</option>' + deptData.data.map(d => `<option value="${d.id}">${d.name} (${d.code})</option>`).join('');
         }
 
-        // 2. Fetch Courses for Subject Form
-        const formDataResponse = await fetch(`${API_BASE_URL}/subject-form-data`, { headers: getAuthHeaders() });
+        const formDataResponse = await fetch(`${window.ADMIN_API_BASE_URL}/subject-form-data`, { headers: getAuthHeaders() });
         const formDataRes = await formDataResponse.json();
         if (formDataResponse.ok && formDataRes.status === 'success') {
             const { courses } = formDataRes.data;
@@ -441,7 +547,6 @@ async function fetchSubjectFormData() {
                 if (currentVal) courseSelect.value = currentVal;
             }
 
-            // Ensure semester select is in default state if no course selected
             if (semesterSelect && (!courseSelect || !courseSelect.value)) {
                 semesterSelect.disabled = true;
                 semesterSelect.innerHTML = '<option value="">Select Semester</option>';
@@ -484,18 +589,19 @@ async function fetchSubjects() {
     if (!tbody) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/subjects`, { headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/subjects`, { headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
             const subjects = resData.data;
 
             if (subjects.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No subjects created yet.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px;">No subjects created yet.</td></tr>`;
             } else {
                 tbody.innerHTML = subjects.map(s => {
                     const courseDisplay = s.course_code ? `${s.course_code}` : (s.course_name || '-');
-                    const semDisplay = s.semester_number ? `Semester ${s.semester_number}` : '-';
+                    const semVal = s.semester_id || s.semester || s.semester_number || s.display_semester || s.sem;
+                    const semDisplay = semVal ? `Sem ${semVal}` : '-';
 
                     return `
                         <tr>
@@ -503,7 +609,7 @@ async function fetchSubjects() {
                             <td>${s.name}</td>
                             <td><span style="background: rgba(16,185,129,0.15); color: var(--accent-emerald); padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700;">${s.type || 'Theory'}</span></td>
                             <td><span style="background: rgba(99,102,241,0.15); color: var(--accent-primary); padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700;">${courseDisplay}</span></td>
-                            <td>${semDisplay}</td>
+                            <td><span style="background: rgba(6,182,212,0.15); color: var(--accent-teal); padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700;">${semDisplay}</span></td>
                             <td>${s.department_name || 'General'}</td>
                             <td>
                                 <button class="btn btn-danger" style="padding: 4px 10px; font-size: 11px;" onclick="deleteSubject(${s.id})">
@@ -524,7 +630,7 @@ async function deleteSubject(id) {
     if (!confirm('Are you sure you want to delete this subject?')) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/subjects/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/subjects/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -549,7 +655,7 @@ async function fetchTeachers() {
     if (!tbody) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/teachers`, { headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/teachers`, { headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -603,7 +709,7 @@ async function deleteTeacher(id) {
     if (!confirm('Are you sure you want to delete this teacher account?')) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/teachers/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/teachers/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -618,12 +724,99 @@ async function deleteTeacher(id) {
     }
 }
 
+async function fetchStudentFormData() {
+    const deptSelect = document.getElementById('student-dept-select') || document.getElementById('deptSelect');
+    const courseSelect = document.getElementById('student-course-select') || document.getElementById('courseSelect');
+    const semesterSelect = document.getElementById('student-semester-select') || document.getElementById('semesterSelect');
+    const sectionSelect = document.getElementById('student-section-select') || document.getElementById('sectionSelect');
+
+    if (semesterSelect && semesterSelect.options.length <= 1) {
+        let semOptions = '<option value="">Select Semester</option>';
+        for (let i = 1; i <= 8; i++) {
+            semOptions += `<option value="${i}">Semester ${i}</option>`;
+        }
+        semesterSelect.innerHTML = semOptions;
+    }
+
+    if (sectionSelect && sectionSelect.options.length <= 1) {
+        let secOptions = '<option value="">Select Section</option>';
+        ['A', 'B', 'C', 'D', 'E'].forEach(letter => {
+            secOptions += `<option value="${letter}">Section ${letter}</option>`;
+        });
+        sectionSelect.innerHTML = secOptions;
+    }
+
+    try {
+        const deptRes = await fetch(`${window.ADMIN_API_BASE_URL}/departments`, { headers: getAuthHeaders() });
+        const deptData = await deptRes.json();
+        if (deptRes.ok && deptData.status === 'success' && deptSelect) {
+            const currentDept = deptSelect.value;
+            deptSelect.innerHTML = '<option value="">Select Department</option>' +
+                deptData.data.map(d => `<option value="${d.id}">${d.name} (${d.code})</option>`).join('');
+            if (currentDept) deptSelect.value = currentDept;
+        }
+
+        const courseRes = await fetch(`${window.ADMIN_API_BASE_URL}/courses`, { headers: getAuthHeaders() });
+        const courseData = await courseRes.json();
+        if (courseRes.ok && courseData.status === 'success' && courseSelect) {
+            const currentCourse = courseSelect.value;
+            courseSelect.innerHTML = '<option value="">Select Course Program</option>' +
+                courseData.data.map(c => `<option value="${c.id}" data-duration="${c.duration_years || 4}" data-dept="${c.department_id || ''}">${c.name} (${c.code})</option>`).join('');
+            if (currentCourse) courseSelect.value = currentCourse;
+        }
+    } catch (err) {
+        console.error('Error loading student form data:', err);
+    }
+}
+
+function initStudentFormCascadingListeners() {
+    const courseSelect = document.getElementById('student-course-select') || document.getElementById('courseSelect');
+    const semesterSelect = document.getElementById('student-semester-select') || document.getElementById('semesterSelect');
+    const deptSelect = document.getElementById('student-dept-select') || document.getElementById('deptSelect');
+
+    if (courseSelect && semesterSelect) {
+        courseSelect.addEventListener('change', () => {
+            const selectedOpt = courseSelect.options[courseSelect.selectedIndex];
+            const duration = selectedOpt ? selectedOpt.getAttribute('data-duration') : 4;
+            const deptId = selectedOpt ? selectedOpt.getAttribute('data-dept') : null;
+
+            if (deptId && deptSelect && !deptSelect.value) {
+                deptSelect.value = deptId;
+            }
+
+            const totalSemesters = duration ? parseInt(duration, 10) * 2 : 8;
+            let semOptions = '<option value="">Select Semester</option>';
+            for (let i = 1; i <= totalSemesters; i++) {
+                semOptions += `<option value="${i}">Semester ${i}</option>`;
+            }
+            semesterSelect.innerHTML = semOptions;
+        });
+    }
+
+    if (deptSelect && courseSelect) {
+        deptSelect.addEventListener('change', () => {
+            const selectedDeptId = deptSelect.value;
+            if (!selectedDeptId) return;
+
+            Array.from(courseSelect.options).forEach(opt => {
+                if (!opt.value) return;
+                const optDept = opt.getAttribute('data-dept');
+                if (optDept && optDept !== selectedDeptId) {
+                    opt.style.display = 'none';
+                } else {
+                    opt.style.display = '';
+                }
+            });
+        });
+    }
+}
+
 async function fetchStudentDepartmentFilterOptions() {
     const filterEl = document.getElementById('student-dept-filter');
     if (!filterEl) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/departments`, { headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/departments`, { headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -647,29 +840,39 @@ async function fetchStudents(department_id = null) {
         const deptId = department_id || (filterEl ? filterEl.value : '');
         const queryStr = deptId ? `?department_id=${deptId}` : '';
 
-        const response = await fetch(`${API_BASE_URL}/students${queryStr}`, { headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/students${queryStr}`, { headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
-            const students = resData.data;
+            const students = resData.data || [];
             currentStudentsList = students;
 
             if (students.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No students enrolled yet.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: var(--text-muted); padding: 20px;">No students enrolled yet.</td></tr>`;
             } else {
                 tbody.innerHTML = students.map(s => {
                     const isInactive = s.status === 'Inactive';
                     let statusBadge = `<span class="badge-present">${s.status}</span>`;
                     if (isInactive) statusBadge = `<span style="background: rgba(244,63,94,0.15); color: #f43f5e; padding: 3px 10px; border-radius: 12px; font-weight: 700; font-size: 11px;">Inactive</span>`;
 
+                    const courseDisplay = s.course_code || s.course_name || '-';
+                    const deptDisplay = s.department_name || (s.department_code || 'General');
+                    const semVal = s.semester_id || s.semester || s.semester_number || s.display_semester;
+                    const semDisplay = semVal ? `Sem ${semVal}` : '-';
+                    const secVal = s.section_name || s.section;
+                    const secDisplay = secVal ? (secVal.toString().toLowerCase().startsWith('sec') ? secVal : `Sec ${secVal}`) : '-';
+
                     return `
                         <tr>
                             <td><strong>${s.enrollment_no}</strong></td>
                             <td>${s.roll_no || '-'}</td>
                             <td>${s.name}</td>
-                            <td><span style="background: rgba(99,102,241,0.15); color: var(--accent-primary); padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700;">${s.course_name || '-'}</span></td>
-                            <td>${s.department_name || 'General'}</td>
+                            <td><span style="background: rgba(99,102,241,0.15); color: var(--accent-primary); padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700;">${courseDisplay}</span></td>
+                            <td>${deptDisplay}</td>
+                            <td><span style="background: rgba(6,182,212,0.15); color: var(--accent-teal); padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700;">${semDisplay}</span></td>
+                            <td><span style="background: rgba(168,85,247,0.15); color: #a855f7; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700;">${secDisplay}</span></td>
                             <td>${s.email}</td>
+                            <td>${s.phone || '-'}</td>
                             <td>${statusBadge}</td>
                             <td>
                                 <div style="display: flex; gap: 6px; flex-wrap: wrap;">
@@ -701,7 +904,7 @@ async function deleteStudent(id) {
     if (!confirm('Are you sure you want to delete this student account?')) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/students/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/students/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -730,11 +933,10 @@ async function openEditTeacherModal(id) {
     document.getElementById('edit-teacher-phone').value = teacher.phone || '';
     document.getElementById('edit-teacher-status').value = teacher.status || 'Active';
 
-    // Populate department options
     const deptSelect = document.getElementById('edit-teacher-dept-select');
     if (deptSelect) {
         try {
-            const response = await fetch(`${API_BASE_URL}/departments`, { headers: getAuthHeaders() });
+            const response = await fetch(`${window.ADMIN_API_BASE_URL}/departments`, { headers: getAuthHeaders() });
             const resData = await response.json();
             if (response.ok && resData.status === 'success') {
                 deptSelect.innerHTML = '<option value="">Select Department</option>' + 
@@ -784,7 +986,7 @@ async function promptResetPassword(userType, userId, userName) {
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/users/reset-password`, {
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/users/reset-password`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({ userType, userId, newPassword: newPassword.trim() })
@@ -803,7 +1005,7 @@ async function promptResetPassword(userType, userId, userName) {
 
 async function toggleUserAccountStatus(userType, userId, status) {
     try {
-        const response = await fetch(`${API_BASE_URL}/users/toggle-status`, {
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/users/toggle-status`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({ userType, userId, status })
@@ -829,12 +1031,23 @@ async function fetchAssignmentFormData() {
     const deptSelect = document.getElementById('assignDepartmentSelect');
     const facultySelect = document.getElementById('assignFacultySelect');
     const subjectSelect = document.getElementById('assignSubjectSelect');
-    const sectionSelect = document.getElementById('assign-section-select');
+    const sectionSelect = document.getElementById('assign-section-select') || document.getElementById('sectionSelect');
 
     if (!deptSelect && !sectionSelect) return;
 
+    if (sectionSelect) {
+        sectionSelect.innerHTML = `
+            <option value="">Select Section (Optional)</option>
+            <option value="A">Section A</option>
+            <option value="B">Section B</option>
+            <option value="C">Section C</option>
+            <option value="D">Section D</option>
+            <option value="E">Section E</option>
+        `;
+    }
+
     try {
-        const response = await fetch(`${API_BASE_URL}/assignment-form-data`, { headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/assignment-form-data`, { headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -855,9 +1068,14 @@ async function fetchAssignmentFormData() {
                 subjectSelect.innerHTML = '<option value="">Select Department First</option>';
             }
 
-            if (sectionSelect && sections) {
+            if (sectionSelect) {
+                const sectionLetters = ['A', 'B', 'C', 'D', 'E'];
                 sectionSelect.innerHTML = '<option value="">Select Section (Optional)</option>' + 
-                    sections.map(sec => `<option value="${sec.id}">${sec.section_name || sec.name}</option>`).join('');
+                    sectionLetters.map(letter => {
+                        const match = (sections && Array.isArray(sections)) ? sections.find(s => (s.name || s.section_name || '').toUpperCase() === letter) : null;
+                        const val = match ? match.id : letter;
+                        return `<option value="${val}">Section ${letter}</option>`;
+                    }).join('');
             }
         }
     } catch (err) {
@@ -870,32 +1088,40 @@ async function fetchAssignedClasses() {
     if (!tbody) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/assigned-classes`, { headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/assigned-classes`, { headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
-            const assignments = resData.data;
+            const assignments = resData.data || [];
 
             if (assignments.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No class mappings created yet.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">No class mappings created yet.</td></tr>`;
             } else {
-                tbody.innerHTML = assignments.map(a => `
-                    <tr>
-                        <td>#${a.class_id}</td>
-                        <td><strong>${a.teacher_name}</strong></td>
-                        <td>${a.subject_name} (${a.subject_code})</td>
-                        <td>Section ${a.section_name || 'A'}</td>
-                        <td>
-                            <button class="btn btn-danger" style="padding: 4px 10px; font-size: 11px;" onclick="deleteAssignedClass(${a.class_id})">
-                                <i class="fa-solid fa-trash"></i> Remove
-                            </button>
-                        </td>
-                    </tr>
-                `).join('');
+                tbody.innerHTML = assignments.map(a => {
+                    const mappingId = a.id || a.mapping_id || a.class_id;
+                    const secName = a.section_name || a.section || '';
+                    const sectionDisplay = secName ? (secName.toLowerCase().startsWith('section') ? secName : `Section ${secName}`) : 'General';
+                    const subjectDisplay = a.subject_name ? `${a.subject_name} ${a.subject_code ? `(${a.subject_code})` : ''}` : '-';
+
+                    return `
+                        <tr>
+                            <td><strong>#${mappingId}</strong></td>
+                            <td><strong>${a.teacher_name || 'Unassigned'}</strong></td>
+                            <td>${subjectDisplay}</td>
+                            <td><span style="background: rgba(99,102,241,0.15); color: var(--accent-primary); padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700;">${sectionDisplay}</span></td>
+                            <td>
+                                <button class="btn btn-danger" style="padding: 4px 10px; font-size: 11px;" onclick="deleteAssignedClass(${mappingId})">
+                                    <i class="fa-solid fa-trash"></i> Remove
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
             }
         }
     } catch (err) {
         console.error('Error fetching assigned classes:', err);
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--accent-rose); padding: 20px;">Failed to load class assignments.</td></tr>`;
     }
 }
 
@@ -903,7 +1129,7 @@ async function deleteAssignedClass(id) {
     if (!confirm('Are you sure you want to remove this class mapping?')) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/assigned-classes/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/assigned-classes/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -917,6 +1143,9 @@ async function deleteAssignedClass(id) {
     }
 }
 
+const removeMapping = deleteAssignedClass;
+window.removeMapping = deleteAssignedClass;
+
 /**
  * 9. ATTENDANCE MASTER LOG & EDIT RECORDS
  */
@@ -925,7 +1154,7 @@ async function fetchMasterAttendanceLogs() {
     if (!tbody) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/attendance`, { headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/attendance`, { headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -963,7 +1192,7 @@ async function fetchMasterAttendanceLogs() {
 
 async function editAttendanceRecord(id, newStatus) {
     try {
-        const response = await fetch(`${API_BASE_URL}/attendance/${id}`, {
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/attendance/${id}`, {
             method: 'PUT',
             headers: getAuthHeaders(),
             body: JSON.stringify({ status: newStatus })
@@ -986,7 +1215,7 @@ async function deleteAttendanceRecord(id) {
     if (!confirm('Are you sure you want to delete this attendance record?')) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/attendance/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/attendance/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -1009,7 +1238,7 @@ async function fetchPendingFaculty() {
     if (!tbody) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/pending-faculty`, { headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/pending-faculty`, { headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -1047,7 +1276,7 @@ async function approveFaculty(teacherId, btnElement) {
     if (!confirm('Are you sure you want to approve this faculty account?')) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/approve-faculty`, {
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/approve-faculty`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({ teacher_id: teacherId })
@@ -1072,7 +1301,7 @@ async function rejectFaculty(teacherId, btnElement) {
     if (!confirm('Are you sure you want to reject and remove this faculty application?')) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/reject-faculty/${teacherId}`, { method: 'DELETE', headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/reject-faculty/${teacherId}`, { method: 'DELETE', headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -1087,38 +1316,40 @@ async function rejectFaculty(teacherId, btnElement) {
     }
 }
 
-async function fetchPendingApprovals() {
+async function loadPendingStudents() {
     const studentTableBody = document.getElementById('pending-approvals-tbody'); 
     
     if (!studentTableBody) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/pending-students`, {
+        studentTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading pending student registrations...</td></tr>';
+
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/pending-students`, {
             method: 'GET',
             headers: getAuthHeaders()
         });
         
         const result = await response.json();
 
-        // Check if data is successful and is an array
         if (response.ok && (result.success || result.status === 'success') && Array.isArray(result.data)) {
             studentTableBody.innerHTML = ''; 
             
             if (result.data.length > 0) {
                 result.data.forEach(student => {
                     const row = document.createElement('tr');
+                    const courseTag = student.course_name ? `<br><small style="color: var(--text-muted); font-size: 11px;">${student.course_name}${student.section_name ? ` - Sec ${student.section_name}` : ''}</small>` : '';
                     row.innerHTML = `
                         <td><span style="background: rgba(99,102,241,0.15); color: var(--accent-primary); padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700;">Student</span></td>
-                        <td><strong>${student.enrollment_no || '-'}</strong></td>
+                        <td><strong>${student.enrollment_no || student.id}</strong>${courseTag}</td>
                         <td>${student.name}</td>
                         <td>${student.email}</td>
-                        <td>${new Date(student.created_at).toLocaleDateString()}</td>
+                        <td>${student.created_at ? new Date(student.created_at).toLocaleDateString() : 'Recent'}</td>
                         <td>
                             <div style="display: flex; gap: 8px;">
-                                <button class="btn btn-primary" style="padding: 4px 10px; font-size: 11px; background: var(--accent-emerald);" onclick="approveStudent(${student.id})">
+                                <button class="btn btn-primary" style="padding: 5px 12px; font-size: 11px; background: var(--accent-emerald); font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" onclick="updateStudentStatus(${student.id}, 'Active')">
                                     <i class="fa-solid fa-check"></i> Approve
                                 </button>
-                                <button class="btn btn-danger" style="padding: 4px 10px; font-size: 11px;" onclick="rejectStudent(${student.id})">
+                                <button class="btn btn-danger" style="padding: 5px 12px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" onclick="updateStudentStatus(${student.id}, 'Inactive')">
                                     <i class="fa-solid fa-xmark"></i> Reject
                                 </button>
                             </div>
@@ -1127,62 +1358,71 @@ async function fetchPendingApprovals() {
                     studentTableBody.appendChild(row);
                 });
             } else {
-                studentTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No pending student registrations.</td></tr>';
+                studentTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">No pending student registrations found.</td></tr>';
             }
         } else {
-            studentTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">${result.message || 'Error fetching pending students'}</td></tr>`;
+            studentTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--accent-rose); padding: 20px;">${result.message || 'Error fetching pending students'}</td></tr>`;
         }
     } catch (error) {
         console.error("Error loading pending students:", error);
-        studentTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Failed to connect to server.</td></tr>';
+        studentTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--accent-rose); padding: 20px;">Failed to connect to server.</td></tr>';
+    }
+}
+
+// Backward compatibility alias
+const fetchPendingApprovals = loadPendingStudents;
+
+async function updateStudentStatus(studentId, status) {
+    const action = status === 'Active' ? 'approve' : 'reject';
+    if (!confirm(`Are you sure you want to ${action} this student registration?`)) return;
+
+    try {
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/students/${studentId}/status`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ status })
+        });
+        const resData = await response.json();
+
+        if (response.ok && (resData.success || resData.status === 'success')) {
+            showToast(resData.message || `Student account ${action}d successfully!`, 'success');
+            loadPendingStudents();
+            if (typeof fetchStudents === 'function') fetchStudents();
+            if (typeof loadDashboardSummary === 'function') loadDashboardSummary();
+        } else {
+            const fallbackUrl = status === 'Active' ? `${window.ADMIN_API_BASE_URL}/approve-student` : `${window.ADMIN_API_BASE_URL}/reject-student/${studentId}`;
+            const fallbackMethod = status === 'Active' ? 'POST' : 'DELETE';
+            const fallbackBody = status === 'Active' ? JSON.stringify({ student_id: studentId }) : null;
+
+            const fallbackRes = await fetch(fallbackUrl, {
+                method: fallbackMethod,
+                headers: getAuthHeaders(),
+                body: fallbackBody
+            });
+            const fallbackData = await fallbackRes.json();
+
+            if (fallbackRes.ok && (fallbackData.success || fallbackData.status === 'success')) {
+                showToast(`Student registration ${action}d successfully!`, 'success');
+                loadPendingStudents();
+                if (typeof fetchStudents === 'function') fetchStudents();
+                if (typeof loadDashboardSummary === 'function') loadDashboardSummary();
+            } else {
+                showToast(resData.message || fallbackData.message || `Failed to ${action} student.`, 'error');
+            }
+        }
+    } catch (err) {
+        console.error(`Error updating student status:`, err);
+        showToast(`Error connecting to server while updating student status.`, 'error');
     }
 }
 
 async function approveStudent(studentId) {
-    if (!confirm('Are you sure you want to approve this student?')) return;
-
-    try {
-        const response = await fetch(`${API_BASE_URL}/approve-student`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ student_id: studentId })
-        });
-        const resData = await response.json();
-
-        if (response.ok && (resData.success || resData.status === 'success')) {
-            showToast('Student approved successfully!');
-            fetchPendingApprovals();
-            fetchStudents();
-            loadDashboardSummary();
-        } else {
-            showToast(resData.message || 'Failed to approve student.', 'error');
-        }
-    } catch (err) {
-        showToast('Error approving student.', 'error');
-    }
+    return updateStudentStatus(studentId, 'Active');
 }
 
 async function rejectStudent(studentId) {
-    if (!confirm('Are you sure you want to reject and remove this pending student registration?')) return;
-
-    try {
-        const response = await fetch(`${API_BASE_URL}/reject-student/${studentId}`, { 
-            method: 'DELETE', 
-            headers: getAuthHeaders() 
-        });
-        const resData = await response.json();
-
-        if (response.ok && (resData.success || resData.status === 'success')) {
-            showToast('Student registration rejected.');
-            fetchPendingApprovals();
-        } else {
-            showToast(resData.message || 'Failed to reject student.', 'error');
-        }
-    } catch (err) {
-        showToast('Error rejecting student.', 'error');
-    }
+    return updateStudentStatus(studentId, 'Inactive');
 }
-
 
 /**
  * 11. SYSTEM SETTINGS
@@ -1195,7 +1435,7 @@ window.fetchSystemSettings = async function() {
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/system-settings`, {
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/system-settings`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -1238,7 +1478,7 @@ function initFormSubmitListeners() {
             const code = document.getElementById('dept-code').value;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/departments`, {
+                const response = await fetch(`${window.ADMIN_API_BASE_URL}/departments`, {
                     method: 'POST',
                     headers: getAuthHeaders(),
                     body: JSON.stringify({ name, code })
@@ -1270,7 +1510,7 @@ function initFormSubmitListeners() {
             const deptVal = document.getElementById('course-dept-select').value;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/courses`, {
+                const response = await fetch(`${window.ADMIN_API_BASE_URL}/courses`, {
                     method: 'POST',
                     headers: getAuthHeaders(),
                     body: JSON.stringify({ name, code, duration_years: Number(durationVal), department_id: Number(deptVal) })
@@ -1303,7 +1543,7 @@ function initFormSubmitListeners() {
             const department_id = document.getElementById('subject-dept-select').value;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/subjects`, {
+                const response = await fetch(`${window.ADMIN_API_BASE_URL}/subjects`, {
                     method: 'POST',
                     headers: getAuthHeaders(),
                     body: JSON.stringify({ 
@@ -1343,7 +1583,7 @@ function initFormSubmitListeners() {
             const department_id = document.getElementById('teacher-dept-select').value;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/teachers`, {
+                const response = await fetch(`${window.ADMIN_API_BASE_URL}/teachers`, {
                     method: 'POST',
                     headers: getAuthHeaders(),
                     body: JSON.stringify({ employee_id, name, email, password, phone, department_id })
@@ -1376,11 +1616,34 @@ function initFormSubmitListeners() {
             const password = document.getElementById('student-password').value;
             const phone = document.getElementById('student-phone').value;
 
+            const deptSelect = document.getElementById('student-dept-select') || document.getElementById('deptSelect');
+            const courseSelect = document.getElementById('student-course-select') || document.getElementById('courseSelect');
+            const semesterSelect = document.getElementById('student-semester-select') || document.getElementById('semesterSelect');
+            const sectionSelect = document.getElementById('student-section-select') || document.getElementById('sectionSelect');
+
+            const department_id = deptSelect ? deptSelect.value : null;
+            const course_id = courseSelect ? courseSelect.value : null;
+            const semester_id = semesterSelect ? semesterSelect.value : null;
+            const section_id = sectionSelect ? sectionSelect.value : null;
+
             try {
-                const response = await fetch(`${API_BASE_URL}/students`, {
+                const response = await fetch(`${window.ADMIN_API_BASE_URL}/students`, {
                     method: 'POST',
                     headers: getAuthHeaders(),
-                    body: JSON.stringify({ enrollment_no, roll_no, name, email, password, phone })
+                    body: JSON.stringify({ 
+                        enrollment_no, 
+                        roll_no, 
+                        name, 
+                        email, 
+                        password, 
+                        phone,
+                        department_id: department_id || null, 
+                        course_id: course_id || null, 
+                        semester_id: semester_id || null, 
+                        semester: semester_id || null, 
+                        section_id: section_id || null, 
+                        section: section_id || null 
+                    })
                 });
                 const resData = await response.json();
 
@@ -1398,7 +1661,7 @@ function initFormSubmitListeners() {
         });
     }
 
-    // Assign Class - Cascading Department Change Listener
+    // Assign Class Form Cascading Listener
     const assignDeptSelect = document.getElementById('assignDepartmentSelect');
     if (assignDeptSelect) {
         assignDeptSelect.addEventListener('change', async (e) => {
@@ -1408,7 +1671,6 @@ function initFormSubmitListeners() {
 
             if (!facultySelect || !subjectSelect) return;
 
-            // 1. If no valid department selected, disable and reset dropdowns
             if (!department_id) {
                 facultySelect.disabled = true;
                 facultySelect.innerHTML = '<option value="">Select Department First</option>';
@@ -1417,23 +1679,20 @@ function initFormSubmitListeners() {
                 return;
             }
 
-            // 2. Enable dropdowns and show loading state
             facultySelect.disabled = false;
             facultySelect.innerHTML = '<option value="">Loading faculty...</option>';
             subjectSelect.disabled = false;
             subjectSelect.innerHTML = '<option value="">Loading subjects...</option>';
 
             try {
-                // 3. Concurrent fetch requests for faculty and subjects by department_id
                 const [facultyRes, subjectRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/faculty/department/${department_id}`, { headers: getAuthHeaders() }),
-                    fetch(`${API_BASE_URL}/subjects/department/${department_id}`, { headers: getAuthHeaders() })
+                    fetch(`${window.ADMIN_API_BASE_URL}/faculty/department/${department_id}`, { headers: getAuthHeaders() }),
+                    fetch(`${window.ADMIN_API_BASE_URL}/subjects/department/${department_id}`, { headers: getAuthHeaders() })
                 ]);
 
                 const facultyData = await facultyRes.json();
                 const subjectData = await subjectRes.json();
 
-                // 4. Populate Faculty Dropdown
                 if (facultyRes.ok && facultyData.status === 'success') {
                     const facultyList = facultyData.data;
                     if (facultyList.length === 0) {
@@ -1446,7 +1705,6 @@ function initFormSubmitListeners() {
                     facultySelect.innerHTML = '<option value="">Failed to load faculty</option>';
                 }
 
-                // 5. Populate Subject Dropdown
                 if (subjectRes.ok && subjectData.status === 'success') {
                     const subjectList = subjectData.data;
                     if (subjectList.length === 0) {
@@ -1466,24 +1724,29 @@ function initFormSubmitListeners() {
         });
     }
 
-    // Assign Class Form
+    // Assign Class Form Submit
     const assignForm = document.getElementById('assign-class-form');
     if (assignForm) {
         assignForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const teacherSelect = document.getElementById('assignFacultySelect') || document.getElementById('assign-teacher-select');
             const subjectSelect = document.getElementById('assignSubjectSelect') || document.getElementById('assign-subject-select');
-            const sectionSelect = document.getElementById('assign-section-select');
+            const sectionSelect = document.getElementById('assign-section-select') || document.getElementById('sectionSelect') || document.querySelector('[name="section"]');
 
             const teacher_id = teacherSelect ? teacherSelect.value : '';
             const subject_id = subjectSelect ? subjectSelect.value : '';
             const section_id = sectionSelect ? sectionSelect.value : '';
 
             try {
-                const response = await fetch(`${API_BASE_URL}/assign-class`, {
+                const response = await fetch(`${window.ADMIN_API_BASE_URL}/assign-class`, {
                     method: 'POST',
                     headers: getAuthHeaders(),
-                    body: JSON.stringify({ teacher_id, subject_id, section_id: section_id || null })
+                    body: JSON.stringify({ 
+                        teacher_id, 
+                        subject_id, 
+                        section_id: section_id || null, 
+                        section: section_id || null 
+                    })
                 });
                 const resData = await response.json();
 
@@ -1529,7 +1792,7 @@ function initFormSubmitListeners() {
             const qr_expiry_seconds = document.getElementById('setting-qr-expiry').value;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/system-settings`, {
+                const response = await fetch(`${window.ADMIN_API_BASE_URL}/system-settings`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1575,7 +1838,7 @@ function initFormSubmitListeners() {
             const status = document.getElementById('edit-teacher-status').value;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/teachers/${id}`, {
+                const response = await fetch(`${window.ADMIN_API_BASE_URL}/teachers/${id}`, {
                     method: 'PUT',
                     headers: getAuthHeaders(),
                     body: JSON.stringify({ employee_id, name, email, phone, department_id, status })
@@ -1609,7 +1872,7 @@ function initFormSubmitListeners() {
             const status = document.getElementById('edit-student-status').value;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/students/${id}`, {
+                const response = await fetch(`${window.ADMIN_API_BASE_URL}/students/${id}`, {
                     method: 'PUT',
                     headers: getAuthHeaders(),
                     body: JSON.stringify({ enrollment_no, roll_no, name, email, phone, status })
@@ -1641,7 +1904,7 @@ function initFormSubmitListeners() {
             const duration_years = document.getElementById('edit-course-duration').value;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/courses/${id}`, {
+                const response = await fetch(`${window.ADMIN_API_BASE_URL}/courses/${id}`, {
                     method: 'PUT',
                     headers: getAuthHeaders(),
                     body: JSON.stringify({ name, code, department_id, duration_years })
@@ -1667,7 +1930,7 @@ async function fetchLeaveRequests() {
     if (!tbody) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/leaves`, { headers: getAuthHeaders() });
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/leaves`, { headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -1715,7 +1978,7 @@ async function fetchLeaveRequests() {
 async function updateLeaveStatus(id, status) {
     const remark = prompt(`Enter admin remark for ${status.toLowerCase()} leave request (optional):`);
     try {
-        const response = await fetch(`${API_BASE_URL}/leaves/${id}/status`, {
+        const response = await fetch(`${window.ADMIN_API_BASE_URL}/leaves/${id}/status`, {
             method: 'PUT',
             headers: getAuthHeaders(),
             body: JSON.stringify({ status, admin_remark: remark })
@@ -1731,31 +1994,4 @@ async function updateLeaveStatus(id, status) {
     } catch (err) {
         showToast('Error updating leave status.', 'error');
     }
-}
-
-/**
- * UTILITY TOAST ENGINE
- */
-function showToast(message, type = 'success') {
-    let container = document.getElementById('toast-container');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'toast-container';
-        document.body.appendChild(container);
-    }
-
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-
-    let icon = 'fa-circle-check';
-    if (type === 'error') icon = 'fa-circle-xmark';
-    if (type === 'warning') icon = 'fa-triangle-exclamation';
-
-    toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
-    container.appendChild(toast);
-
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 300);
-    }, 4000);
 }

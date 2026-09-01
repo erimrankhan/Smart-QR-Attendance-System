@@ -57,7 +57,9 @@ router.post('/change-password', studentController.changePassword);
 
 // Module 4: Leave Management & Notifications
 router.post('/leaves', studentController.applyLeave);
+router.post('/apply-leave', studentController.applyLeave);
 router.get('/leaves', studentController.getLeaveHistory);
+router.get('/my-leaves', studentController.getLeaveHistory);
 router.get('/notifications', studentController.getNotifications);
 router.post('/notifications/read', studentController.markNotificationsRead);
 

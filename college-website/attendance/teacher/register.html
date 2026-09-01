@@ -137,6 +137,148 @@
             transform: translateY(-2px);
             box-shadow: 0 10px 25px rgba(13, 148, 136, 0.5);
         }
+
+        /* Inline Action Wrapper for Send OTP */
+        .input-action-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        .input-action-wrapper .form-control {
+            padding-right: 115px;
+        }
+
+        .btn-otp-action {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 7px 14px;
+            background: linear-gradient(135deg, var(--accent-teal), #0284c7);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: var(--radius-sm);
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-otp-action:hover:not(:disabled) {
+            background: linear-gradient(135deg, #0f766e, #0369a1);
+            box-shadow: 0 4px 12px rgba(13, 148, 136, 0.4);
+        }
+
+        .btn-otp-action:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background: #334155;
+            border-color: transparent;
+        }
+
+        /* Expandable OTP Verification Box */
+        .otp-verification-box {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            padding: 12px 14px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px dashed rgba(13, 148, 136, 0.5);
+            border-radius: var(--radius-md);
+            margin-top: 6px;
+            animation: fadeInDown 0.3s ease;
+        }
+
+        .otp-verification-box.active {
+            display: flex;
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .otp-input-group {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .otp-input-custom {
+            flex: 1;
+            padding: 9px 12px 9px 34px;
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 14.5px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        .otp-input-custom:focus {
+            outline: none;
+            border-color: var(--accent-teal);
+            box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.25);
+        }
+
+        .btn-verify-action {
+            padding: 9px 15px;
+            background: linear-gradient(135deg, var(--accent-teal), #0284c7);
+            border: none;
+            border-radius: var(--radius-sm);
+            color: #ffffff;
+            font-size: 12.5px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-verify-action:hover:not(:disabled) {
+            background: linear-gradient(135deg, #0f766e, #0369a1);
+            box-shadow: 0 4px 14px rgba(13, 148, 136, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-verify-action:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .otp-status-msg {
+            font-size: 11.5px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .verified-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: #10b981;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+        }
     </style>
 </head>
 <body>
@@ -167,26 +309,51 @@
                 </div>
             </div>
 
-            <div class="form-grid-2">
-                <!-- Email -->
-                <div class="form-group">
+            <!-- Institutional Email with Inline OTP Verification -->
+            <div class="form-group">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
                     <label for="email"><i class="fa-solid fa-envelope" style="color: var(--accent-teal);"></i> Institutional Email *</label>
-                    <input type="email" id="email" class="form-control" placeholder="Your Email Address" required>
+                    <span id="facultyEmailVerifiedBadge" class="verified-badge" style="display: none;">
+                        <i class="fa-solid fa-circle-check"></i> Email Verified
+                    </span>
+                </div>
+                <div class="input-action-wrapper">
+                    <input type="email" id="email" class="form-control" placeholder="faculty.member@college.edu" required>
+                    <button type="button" id="sendFacultyOtpBtn" class="btn-otp-action">
+                        <i class="fa-solid fa-paper-plane"></i> <span>Send OTP</span>
+                    </button>
                 </div>
 
+                <!-- Expandable Faculty OTP Box -->
+                <div id="facultyOtpBox" class="otp-verification-box">
+                    <div class="otp-input-group">
+                        <i class="fa-solid fa-key" style="color: var(--accent-teal); font-size: 13px; position: absolute; left: 12px;"></i>
+                        <input type="text" id="facultyOtpInput" class="otp-input-custom" maxlength="6" placeholder="6-digit OTP" autocomplete="one-time-code">
+                        <button type="button" id="verifyFacultyOtpBtn" class="btn-verify-action">
+                            <i class="fa-solid fa-check"></i> <span>Verify OTP</span>
+                        </button>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 2px;">
+                        <small id="facultyOtpStatus" class="otp-status-msg">Enter the 6-digit code sent to your official email.</small>
+                        <button type="button" id="changeFacultyEmailBtn" style="background: none; border: none; color: var(--accent-teal); font-size: 11.5px; cursor: pointer; text-decoration: underline; display: none;">Change Email</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-grid-2">
                 <!-- Phone -->
                 <div class="form-group">
                     <label for="phone"><i class="fa-solid fa-phone" style="color: var(--accent-amber);"></i> Contact Phone</label>
                     <input type="tel" id="phone" class="form-control" placeholder="+91 9876543210">
                 </div>
-            </div>
 
-            <!-- Department Dropdown -->
-            <div class="form-group">
-                <label for="departmentSelect"><i class="fa-solid fa-building-columns" style="color: var(--accent-teal);"></i> Academic Department *</label>
-                <select id="departmentSelect" class="form-control" required>
-                    <option value="">Loading departments...</option>
-                </select>
+                <!-- Academic Department Dropdown -->
+                <div class="form-group">
+                    <label for="departmentSelect"><i class="fa-solid fa-building-columns" style="color: var(--accent-teal);"></i> Academic Department *</label>
+                    <select id="departmentSelect" class="form-control" required>
+                        <option value="">Loading departments...</option>
+                    </select>
+                </div>
             </div>
 
             <!-- Password -->

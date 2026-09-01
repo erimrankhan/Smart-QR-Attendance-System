@@ -227,6 +227,148 @@
             color: #818cf8;
         }
 
+        /* Inline Action Wrapper for Send OTP */
+        .input-action-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        .input-action-wrapper .form-control-custom {
+            padding-right: 110px;
+        }
+
+        .btn-otp-action {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 7px 14px;
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-otp-action:hover:not(:disabled) {
+            background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-otp-action:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background: #334155;
+            border-color: transparent;
+        }
+
+        /* Expandable OTP Verification Box */
+        .otp-verification-box {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            padding: 14px 16px;
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px dashed rgba(99, 102, 241, 0.4);
+            border-radius: 14px;
+            margin-top: 6px;
+            animation: fadeInDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .otp-verification-box.active {
+            display: flex;
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .otp-input-group {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .otp-input-custom {
+            flex: 1;
+            padding: 10px 14px 10px 38px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 10px;
+            color: #f8fafc;
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        .otp-input-custom:focus {
+            outline: none;
+            border-color: #06b6d4;
+            box-shadow: 0 0 14px rgba(6, 182, 212, 0.35);
+        }
+
+        .btn-verify-action {
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+            border: none;
+            border-radius: 10px;
+            color: #ffffff;
+            font-size: 12.5px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-verify-action:hover:not(:disabled) {
+            background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+            box-shadow: 0 4px 14px rgba(6, 182, 212, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-verify-action:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .otp-status-msg {
+            font-size: 11.5px;
+            font-weight: 600;
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .verified-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: #10b981;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
         /* Password Show Toggle */
         .toggle-password {
             position: absolute;
@@ -314,30 +456,6 @@
                 font-size: 22px;
             }
         }
-        /* Dropdown ki styling ko baki dark theme jaisa banane ke liye */
-#courseSelect {
-    width: 100%;
-    background-color: transparent; /* Background ko dark/transparent karta hai */
-    color: #94a3b8; /* Text ka color light gray/white karega */
-    border: 1px solid #334155; /* Baki inputs jaisa border color */
-    border-radius: 8px; /* Rounded corners */
-    padding: 12px 12px 12px 40px; /* IMPORTANT: Left me 40px jagah banayega taaki icon overlap na kare */
-    appearance: none; /* Browser ki default white styling ko hatata hai */
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    outline: none;
-}
-
-/* Jab dropdown khulega, toh uski list bhi dark dikhegi */
-#courseSelect option {
-    background-color: #0f172a; /* Apne form ke background jaisa dark color yahan daalein */
-    color: #ffffff;
-}
-
-/* Focus hone par border highlight */
-#courseSelect:focus {
-    border-color: #3b82f6; /* Blue highlight */
-}
     </style>
 </head>
 
@@ -369,7 +487,7 @@
                     <label for="enrollment_no">Enrollment No. *</label>
                     <div class="input-wrapper">
                         <i class="fa-solid fa-id-card input-icon"></i>
-                        <input type="text" id="enrollment_no" class="form-control-custom" placeholder="Enrollment Id"
+                        <input type="text" id="enrollment_no" class="form-control-custom" placeholder="25170XX"
                             required>
                     </div>
                 </div>
@@ -378,7 +496,7 @@
                     <label for="roll_no">Roll Number</label>
                     <div class="input-wrapper">
                         <i class="fa-solid fa-hashtag input-icon"></i>
-                        <input type="text" id="roll_no" class="form-control-custom" placeholder="Roll NO">
+                        <input type="text" id="roll_no" class="form-control-custom" placeholder="250082014XXXX">
                     </div>
                 </div>
             </div>
@@ -388,17 +506,39 @@
                 <label for="name">Full Name *</label>
                 <div class="input-wrapper">
                     <i class="fa-solid fa-user input-icon"></i>
-                    <input type="text" id="name" class="form-control-custom" placeholder="Your Name" required>
+                    <input type="text" id="name" class="form-control-custom" placeholder="IMRAN KHAN" required>
                 </div>
             </div>
 
-            <!-- Student Email -->
+            <!-- Student Email with Inline OTP Action -->
             <div class="form-group">
-                <label for="email">Student Email *</label>
-                <div class="input-wrapper">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <label for="email">Student Email *</label>
+                    <span id="emailVerifiedBadge" class="verified-badge" style="display: none;">
+                        <i class="fa-solid fa-circle-check"></i> Email Verified
+                    </span>
+                </div>
+                <div class="input-action-wrapper">
                     <i class="fa-solid fa-envelope input-icon"></i>
-                    <input type="email" id="email" class="form-control-custom" placeholder="Your Email Address"
-                        required>
+                    <input type="email" id="email" class="form-control-custom" placeholder="imran.student@college.edu" required>
+                    <button type="button" id="sendOtpBtn" class="btn-otp-action">
+                        <i class="fa-solid fa-paper-plane"></i> <span>Send OTP</span>
+                    </button>
+                </div>
+
+                <!-- Expandable OTP Verification Box -->
+                <div id="otpVerificationBox" class="otp-verification-box">
+                    <div class="otp-input-group">
+                        <i class="fa-solid fa-key input-icon" style="left: 12px;"></i>
+                        <input type="text" id="otpInput" class="otp-input-custom" maxlength="6" placeholder="6-digit OTP" autocomplete="one-time-code">
+                        <button type="button" id="verifyOtpBtn" class="btn-verify-action">
+                            <i class="fa-solid fa-check"></i> <span>Verify OTP</span>
+                        </button>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 2px;">
+                        <small id="otpStatusMsg" class="otp-status-msg">Enter the 6-digit code sent to your email.</small>
+                        <button type="button" id="changeEmailBtn" style="background: none; border: none; color: #818cf8; font-size: 11px; cursor: pointer; text-decoration: underline; display: none;">Change Email</button>
+                    </div>
                 </div>
             </div>
 
@@ -407,22 +547,37 @@
                 <label for="courseSelect">Degree / Course Program *</label>
                 <div class="input-wrapper">
                     <i class="fa-solid fa-book-bookmark input-icon"></i>
-                    <!-- HTML mein yeh aisa dikhna chahiye -->
-                     <!-- Agar Enrolled section mein class="form-input" hai, toh yahan bhi wahi lagayein -->
-<select id="courseSelect" class="form-input" required>
-    <option value="">Select Degree Program *</option>
-</select>
+                    <select id="courseSelect" name="course_id" class="form-control-custom" required>
+                        <option value="">Loading courses...</option>
+                    </select>
                 </div>
             </div>
 
-            <!-- Section Select Dropdown -->
-            <div class="form-group">
-                <label for="sectionSelect">Enrolled Section (Optional)</label>
-                <div class="input-wrapper">
-                    <i class="fa-solid fa-graduation-cap input-icon"></i>
-                    <select id="sectionSelect" class="form-control-custom">
-                        <option value="">Loading sections...</option>
-                    </select>
+            <!-- Row: Semester & Section Selection (2-Column Grid) -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="semesterSelect">Current Semester *</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-calendar-days input-icon"></i>
+                        <select id="semesterSelect" name="semester_id" class="form-control-custom" disabled required>
+                            <option value="">-- Select Degree / Course First --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="sectionSelect">Enrolled Section</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-graduation-cap input-icon"></i>
+                        <select id="sectionSelect" name="section_id" class="form-control-custom">
+                            <option value="">Select Section (Optional)</option>
+                            <option value="A">Section A</option>
+                            <option value="B">Section B</option>
+                            <option value="C">Section C</option>
+                            <option value="D">Section D</option>
+                            <option value="E">Section E</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -480,72 +635,364 @@
             });
         }
 
-        // Load Public Dropdowns on Page Load
+        const SERVER_URL = `http://${HOST_IP}:5000`;
+
+        let loadedCoursesCache = [];
+
+        // Helper: Convert number to ordinal string (1 -> 1st, 2 -> 2nd, etc.)
+        function getOrdinal(n) {
+            const s = ["th", "st", "nd", "rd"];
+            const v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        }
+
+        // Helper: Determine total semesters for a program
+        function determineMaxSemesters(course) {
+            if (!course) return 8;
+
+            // 1. Explicit total_semesters property
+            if (course.total_semesters && !isNaN(parseInt(course.total_semesters, 10))) {
+                return parseInt(course.total_semesters, 10);
+            }
+
+            // 2. Direct calculation from duration_years (e.g. 2 yrs -> 4 sem, 3 yrs -> 6 sem, 4 yrs -> 8 sem)
+            if (course.duration_years && !isNaN(parseInt(course.duration_years, 10))) {
+                const years = parseInt(course.duration_years, 10);
+                if (years >= 1 && years <= 6) {
+                    return years * 2;
+                }
+            }
+
+            // 3. Pattern Matching by Course Name / Code
+            const text = `${course.name || ''} ${course.code || ''}`.toUpperCase();
+
+            // 2 Years (4 Semesters): MCA, MBA, M.SC, M.TECH, MCOM, MA, Post Graduate
+            if (/\b(MCA|MBA|M\.?SC|M\.?TECH|M\.?COM|M\.?A|M\.?PLAN|POST\s*GRADUATE|MASTER)\b/i.test(text)) {
+                return 4;
+            }
+
+            // 3 Years (6 Semesters): BCA, BBA, B.SC, BCOM, BA, DIPLOMA, POLYTECHNIC
+            if (/\b(BCA|BBA|B\.?SC|B\.?COM|B\.?A|DIPLOMA|POLYTECHNIC)\b/i.test(text)) {
+                return 6;
+            }
+
+            // 4 Years (8 Semesters): B.TECH, BE, ENGINEERING, TECHNOLOGY, B.PHARM
+            if (/\b(B\.?TECH|B\.?E|ENGINEERING|TECHNOLOGY|B\.?PHARM)\b/i.test(text)) {
+                return 8;
+            }
+
+            return 8; // Default Fallback
+        }
+
+        // Load Courses on Page Load
         window.addEventListener('DOMContentLoaded', () => {
-            fetchPublicCourses();
-            fetchPublicSections();
+            loadCourses();
         });
 
-        async function fetchPublicCourses() {
+        async function loadCourses() {
             const courseDropdown = document.getElementById('courseSelect');
             if (!courseDropdown) return;
 
             try {
                 courseDropdown.innerHTML = '<option value="">Loading courses...</option>';
-                
-                const response = await fetch(`${API_BASE_URL}/public/courses`); 
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const resData = await response.json();
-                
-                if (resData.status === 'success' && resData.data && resData.data.length > 0) {
-                    courseDropdown.innerHTML = '<option value="">Select Degree Program *</option>';
-                    resData.data.forEach(course => {
-                        const option = document.createElement('option');
-                        option.value = course.id;
-                        option.textContent = `${course.name} (${course.code})`;
-                        courseDropdown.appendChild(option);
-                    });
+
+                const response = await fetch(`${SERVER_URL}/api/public/courses`);
+                const result = await response.json();
+
+                const courseList = result.data || result.courses || [];
+                loadedCoursesCache = courseList;
+
+                if (courseList.length > 0) {
+                    courseDropdown.innerHTML = '<option value="">Select Degree / Course Program *</option>' +
+                        courseList.map(course => `<option value="${course.id}">${course.name} (${course.code})</option>`).join('');
                 } else {
                     courseDropdown.innerHTML = '<option value="">No courses available</option>';
                 }
             } catch (error) {
-                console.error('Error fetching courses:', error);
-                courseDropdown.innerHTML = '<option value="">Failed to load courses</option>';
-                if (typeof showToast === 'function') {
-                    showToast('Unable to load courses. Please try again later.', 'error');
-                }
+                console.error('Error loading courses:', error);
+                courseDropdown.innerHTML = '<option value="">Error connecting to server</option>';
             }
         }
 
-        async function fetchPublicSections() {
-            const selectEl = document.getElementById('sectionSelect');
-            if (!selectEl) return;
-            try {
-                const response = await fetch(`${API_BASE_URL}/auth/public-sections`);
-                const resData = await response.json();
+        // Handler: Dynamic Course Selection Change (Updates Valid Semesters & Sections)
+        function handleCourseChange(courseId) {
+            const semesterSelect = document.getElementById('semesterSelect');
+            if (!semesterSelect) return;
 
-                if (response.ok && resData.status === 'success') {
-                    const sections = resData.data;
-                    if (sections.length === 0) {
-                        selectEl.innerHTML = `<option value="">No active sections available</option>`;
-                    } else {
-                        selectEl.innerHTML = `<option value="">Select Enrolled Section (Optional)</option>` +
-                            sections.map(s => `
-                                <option value="${s.id}">
-                                    Section ${s.section_name} ${s.course_name ? `(${s.course_name} - Sem ${s.semester_number || 1})` : ''}
-                                </option>
-                            `).join('');
-                    }
+            // 1. If no course selected, reset and disable semester dropdown
+            if (!courseId) {
+                semesterSelect.innerHTML = '<option value="">-- Select Degree / Course First --</option>';
+                semesterSelect.disabled = true;
+                semesterSelect.value = '';
+                loadSectionsForCourse(null);
+                return;
+            }
+
+            // 2. Find selected course object from cache
+            const selectedCourse = loadedCoursesCache.find(c => String(c.id) === String(courseId));
+            const maxSemesters = determineMaxSemesters(selectedCourse);
+
+            // 3. Rebuild valid semester options dynamically
+            let optionsHtml = '<option value="">Select Current Semester *</option>';
+            for (let i = 1; i <= maxSemesters; i++) {
+                optionsHtml += `<option value="${i}">Semester ${i} (${getOrdinal(i)} Sem)</option>`;
+            }
+
+            semesterSelect.innerHTML = optionsHtml;
+            semesterSelect.disabled = false;
+            semesterSelect.value = ''; // Always reset semester on course switch to avoid invalid selection
+
+            // 4. Reload valid sections for the selected course
+            loadSectionsForCourse(courseId);
+        }
+
+        async function loadSectionsForCourse(courseId) {
+            const sectionDropdown = document.getElementById('sectionSelect');
+            if (!sectionDropdown) return;
+
+            const defaultOptions = `
+                <option value="">Select Section (Optional)</option>
+                <option value="A">Section A</option>
+                <option value="B">Section B</option>
+                <option value="C">Section C</option>
+                <option value="D">Section D</option>
+                <option value="E">Section E</option>
+            `;
+
+            if (!courseId) {
+                sectionDropdown.innerHTML = defaultOptions;
+                return;
+            }
+
+            try {
+                const response = await fetch(`${SERVER_URL}/api/public/sections/${courseId}`);
+                const result = await response.json();
+
+                const sections = result.data || result.sections || [];
+
+                if (sections.length > 0) {
+                    sectionDropdown.innerHTML = '<option value="">Select Section (Optional)</option>' +
+                        sections.map(s => {
+                            const name = s.name || s.section_name || 'Section';
+                            const semText = s.semester_number ? ` (Sem ${s.semester_number})` : '';
+                            return `<option value="${s.id || name}">Section ${name}${semText}</option>`;
+                        }).join('');
                 } else {
-                    selectEl.innerHTML = `<option value="">Failed to load sections</option>`;
+                    sectionDropdown.innerHTML = defaultOptions;
                 }
             } catch (err) {
-                selectEl.innerHTML = `<option value="">Error connecting to server</option>`;
+                console.warn('Using standard section fallback:', err);
+                sectionDropdown.innerHTML = defaultOptions;
             }
+        }
+
+        // Dynamic Course Selection Change Listener
+        const courseSelectEl = document.getElementById('courseSelect');
+        if (courseSelectEl) {
+            courseSelectEl.addEventListener('change', (e) => {
+                handleCourseChange(e.target.value);
+            });
+        }
+
+        // OTP Verification State & Controls
+        let isEmailVerified = false;
+        let otpCooldownTimer = null;
+        let otpSecondsRemaining = 0;
+
+        const emailInput = document.getElementById('email');
+        const sendOtpBtn = document.getElementById('sendOtpBtn');
+        const otpVerificationBox = document.getElementById('otpVerificationBox');
+        const otpInput = document.getElementById('otpInput');
+        const verifyOtpBtn = document.getElementById('verifyOtpBtn');
+        const otpStatusMsg = document.getElementById('otpStatusMsg');
+        const changeEmailBtn = document.getElementById('changeEmailBtn');
+        const emailVerifiedBadge = document.getElementById('emailVerifiedBadge');
+
+        // Start Resend OTP Cooldown Timer
+        function startOtpCooldown(duration = 60) {
+            otpSecondsRemaining = duration;
+            if (sendOtpBtn) {
+                sendOtpBtn.disabled = true;
+                sendOtpBtn.innerHTML = `<i class="fa-solid fa-clock"></i> <span>Resend (${otpSecondsRemaining}s)</span>`;
+            }
+
+            clearInterval(otpCooldownTimer);
+            otpCooldownTimer = setInterval(() => {
+                otpSecondsRemaining--;
+                if (otpSecondsRemaining <= 0) {
+                    clearInterval(otpCooldownTimer);
+                    if (sendOtpBtn && !isEmailVerified) {
+                        sendOtpBtn.disabled = false;
+                        sendOtpBtn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> <span>Resend OTP</span>`;
+                    }
+                } else {
+                    if (sendOtpBtn && !isEmailVerified) {
+                        sendOtpBtn.innerHTML = `<i class="fa-solid fa-clock"></i> <span>Resend (${otpSecondsRemaining}s)</span>`;
+                    }
+                }
+            }, 1000);
+        }
+
+        // Send OTP Click Handler
+        if (sendOtpBtn) {
+            sendOtpBtn.addEventListener('click', async () => {
+                const emailVal = emailInput ? emailInput.value.trim() : '';
+
+                if (!emailVal) {
+                    if (typeof showToast === 'function') showToast('Please enter your email address first.', 'warning');
+                    else alert('Please enter your email address first.');
+                    if (emailInput) emailInput.focus();
+                    return;
+                }
+
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(emailVal)) {
+                    if (typeof showToast === 'function') showToast('Please enter a valid email address.', 'error');
+                    else alert('Please enter a valid email address.');
+                    if (emailInput) emailInput.focus();
+                    return;
+                }
+
+                sendOtpBtn.disabled = true;
+                sendOtpBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Sending...</span>`;
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/auth/send-otp`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: emailVal })
+                    });
+                    const resData = await response.json();
+
+                    if (response.ok && resData.status === 'success') {
+                        if (typeof showToast === 'function') {
+                            showToast(resData.message || `OTP sent successfully to ${emailVal}`);
+                        } else {
+                            alert(resData.message || `OTP sent successfully to ${emailVal}`);
+                        }
+
+                        // Expand OTP verification box and lock email input
+                        if (otpVerificationBox) {
+                            otpVerificationBox.style.display = 'flex';
+                            otpVerificationBox.classList.add('active');
+                        }
+                        if (emailInput) emailInput.readOnly = true;
+                        if (changeEmailBtn) changeEmailBtn.style.display = 'inline-block';
+                        if (otpInput) {
+                            otpInput.value = '';
+                            otpInput.focus();
+                        }
+                        if (otpStatusMsg) {
+                            otpStatusMsg.innerHTML = `<i class="fa-solid fa-paper-plane" style="color: #38bdf8;"></i> Code sent to <strong style="color:#f8fafc;">${emailVal}</strong> (valid for 10m)`;
+                        }
+
+                        startOtpCooldown(60);
+                    } else {
+                        if (typeof showToast === 'function') {
+                            showToast(resData.message || 'Failed to send OTP.', 'error');
+                        } else {
+                            alert(resData.message || 'Failed to send OTP.');
+                        }
+                        sendOtpBtn.disabled = false;
+                        sendOtpBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Send OTP</span>`;
+                    }
+                } catch (err) {
+                    console.error('Send OTP network error:', err);
+                    if (typeof showToast === 'function') showToast('Connection error. Failed to reach server.', 'error');
+                    else alert('Connection error. Failed to reach server.');
+                    sendOtpBtn.disabled = false;
+                    sendOtpBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Send OTP</span>`;
+                }
+            });
+        }
+
+        // Verify OTP Click Handler
+        if (verifyOtpBtn) {
+            verifyOtpBtn.addEventListener('click', async () => {
+                const emailVal = emailInput ? emailInput.value.trim() : '';
+                const otpVal = otpInput ? otpInput.value.trim() : '';
+
+                if (!otpVal || otpVal.length < 4) {
+                    if (typeof showToast === 'function') showToast('Please enter the 6-digit OTP code.', 'warning');
+                    else alert('Please enter the 6-digit OTP code.');
+                    if (otpInput) otpInput.focus();
+                    return;
+                }
+
+                verifyOtpBtn.disabled = true;
+                verifyOtpBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Verifying...</span>`;
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: emailVal, otp: otpVal })
+                    });
+                    const resData = await response.json();
+
+                    if (response.ok && resData.status === 'success') {
+                        isEmailVerified = true;
+                        clearInterval(otpCooldownTimer);
+
+                        if (typeof showToast === 'function') {
+                            showToast('Email verified successfully!', 'success');
+                        } else {
+                            alert('Email verified successfully!');
+                        }
+
+                        // Update UI states on success
+                        if (emailVerifiedBadge) emailVerifiedBadge.style.display = 'inline-flex';
+                        if (sendOtpBtn) sendOtpBtn.style.display = 'none';
+                        if (otpVerificationBox) otpVerificationBox.style.display = 'none';
+                        if (emailInput) {
+                            emailInput.readOnly = true;
+                            emailInput.style.borderColor = '#10b981';
+                        }
+                    } else {
+                        if (typeof showToast === 'function') {
+                            showToast(resData.message || 'Invalid or expired OTP code.', 'error');
+                        } else {
+                            alert(resData.message || 'Invalid or expired OTP code.');
+                        }
+                        verifyOtpBtn.disabled = false;
+                        verifyOtpBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span>Verify OTP</span>`;
+                        if (otpInput) {
+                            otpInput.style.borderColor = '#f43f5e';
+                            otpInput.focus();
+                        }
+                    }
+                } catch (err) {
+                    console.error('Verify OTP network error:', err);
+                    if (typeof showToast === 'function') showToast('Connection error during verification.', 'error');
+                    else alert('Connection error during verification.');
+                    verifyOtpBtn.disabled = false;
+                    verifyOtpBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span>Verify OTP</span>`;
+                }
+            });
+        }
+
+        // Change Email Button Click Handler
+        if (changeEmailBtn) {
+            changeEmailBtn.addEventListener('click', () => {
+                clearInterval(otpCooldownTimer);
+                isEmailVerified = false;
+                if (emailInput) {
+                    emailInput.readOnly = false;
+                    emailInput.style.borderColor = '';
+                    emailInput.focus();
+                }
+                if (otpVerificationBox) {
+                    otpVerificationBox.style.display = 'none';
+                    otpVerificationBox.classList.remove('active');
+                }
+                if (sendOtpBtn) {
+                    sendOtpBtn.disabled = false;
+                    sendOtpBtn.style.display = 'inline-flex';
+                    sendOtpBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Send OTP</span>`;
+                }
+                if (emailVerifiedBadge) emailVerifiedBadge.style.display = 'none';
+                if (otpInput) otpInput.value = '';
+            });
         }
 
         // Form Submit Handler
@@ -553,11 +1000,33 @@
             e.preventDefault();
             const submitBtn = document.getElementById('submit-btn');
             const courseVal = document.getElementById('courseSelect').value;
+            const semesterVal = document.getElementById('semesterSelect').value;
             const secVal = document.getElementById('sectionSelect').value;
 
+            // 1. Email OTP Verification Guard
+            if (!isEmailVerified) {
+                if (typeof showToast === 'function') {
+                    showToast('Please verify your email address via OTP first.', 'warning');
+                } else {
+                    alert('Please verify your email address via OTP first.');
+                }
+                if (!otpVerificationBox.classList.contains('active')) {
+                    if (sendOtpBtn) sendOtpBtn.click();
+                } else {
+                    if (otpInput) otpInput.focus();
+                }
+                return;
+            }
+
             if (!courseVal) {
-                if (typeof showToast === 'function') showToast('Please select a Course.', 'error');
-                else alert('Please select a Course.');
+                if (typeof showToast === 'function') showToast('Please select a Degree / Course Program.', 'error');
+                else alert('Please select a Degree / Course Program.');
+                return;
+            }
+
+            if (!semesterVal) {
+                if (typeof showToast === 'function') showToast('Please select your Current Semester.', 'error');
+                else alert('Please select your Current Semester.');
                 return;
             }
 
@@ -569,10 +1038,11 @@
                 roll_no: document.getElementById('roll_no').value.trim() || null,
                 name: document.getElementById('name').value.trim(),
                 email: document.getElementById('email').value.trim(),
-                password: document.getElementById('password').value,
-                phone: document.getElementById('phone').value.trim() || null,
                 course_id: parseInt(courseVal, 10),
-                section_id: secVal ? parseInt(secVal, 10) : null
+                semester_id: parseInt(semesterVal, 10) || 1,
+                section_id: secVal || null,
+                password: document.getElementById('password').value,
+                phone: document.getElementById('phone').value.trim() || null
             };
 
             console.log("Sending Student Registration payload:", payload);

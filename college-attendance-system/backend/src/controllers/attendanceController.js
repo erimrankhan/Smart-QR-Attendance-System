@@ -33,8 +33,9 @@ exports.createAttendanceSession = async (req, res) => {
             [targetClassId]
         );
 
-        // Generate secure random QR token string using crypto.randomBytes
+        // Generate secure random QR token string and 8-digit numeric PIN
         const qrToken = crypto.randomBytes(32).toString('hex');
+        const sessionPin = Math.floor(10000000 + Math.random() * 90000000).toString();
 
         // Set expiry time (60 seconds)
         const expiresAt = new Date(Date.now() + 60 * 1000);
@@ -42,9 +43,9 @@ exports.createAttendanceSession = async (req, res) => {
 
         // SQL INSERT explicitly sets session status to 'Active'
         const [result] = await pool.query(`
-            INSERT INTO AttendanceSessions (class_id, teacher_id, qr_code_hash, status, expires_at)
-            VALUES (?, ?, ?, 'Active', ?)
-        `, [targetClassId, teacher_id, qrToken, mysqlExpiresAt]);
+            INSERT INTO AttendanceSessions (class_id, teacher_id, qr_code_hash, session_pin, status, expires_at)
+            VALUES (?, ?, ?, ?, 'Active', ?)
+        `, [targetClassId, teacher_id, qrToken, sessionPin, mysqlExpiresAt]);
 
         const sessionId = result.insertId;
 
@@ -56,11 +57,17 @@ exports.createAttendanceSession = async (req, res) => {
             sessionId: sessionId,
             qr_token: qrToken,
             qrHash: qrToken,
+            session_pin: sessionPin,
+            sessionPin: sessionPin,
+            pin: sessionPin,
             data: {
                 session_id: sessionId,
                 sessionId: sessionId,
                 qr_token: qrToken,
                 qrHash: qrToken,
+                session_pin: sessionPin,
+                sessionPin: sessionPin,
+                pin: sessionPin,
                 status: 'active',
                 expiresAt: expiresAt.toISOString()
             }
@@ -78,81 +85,86 @@ exports.createAttendanceSession = async (req, res) => {
 /**
  * 3. Backend: Mark Attendance API
  * POST /api/student/mark-attendance or /api/attendance/mark-attendance
- * 
- * Strictly checks: SELECT * FROM AttendanceSessions WHERE id = ? AND (status = 'active' OR status = 'Active') AND qr_code_hash = ?
- * If no record is found, returns: { success: false, message: "Attendance session is inactive or QR token is invalid." }
  */
 exports.markAttendance = async (req, res) => {
     console.log("RECEIVED BODY:", req.body);
 
     const sessionId = req.body.session_id || req.body.sessionId;
     const qrToken = req.body.qr_token || req.body.qrToken || req.body.qrHash || req.body.qr_hash;
+    const rawPin = req.body.pin || req.body.session_pin || req.body.sessionPin;
+    const pin = rawPin ? String(rawPin).trim() : null;
     const student_id = req.user ? req.user.id : req.body.student_id;
 
-    if (!sessionId) {
-        console.log("MISSING SESSION ID IN REQ.BODY:", req.body);
+    if (!qrToken && !pin) {
         return res.status(400).json({
             success: false,
             status: 'fail',
-            message: 'Session ID is missing from request body.'
+            message: 'QR token or 8-digit Classroom PIN is required.'
         });
     }
 
     try {
-        // Query strictly by session_id without status and token in SQL
-        const [sessions] = await pool.query(
-            `SELECT * FROM AttendanceSessions WHERE id = ?`,
-            [sessionId]
-        );
+        let sessions = [];
+        if (sessionId) {
+            const [rows] = await pool.query(
+                `SELECT * FROM AttendanceSessions WHERE id = ?`,
+                [sessionId]
+            );
+            sessions = rows;
+        } else if (pin) {
+            const [rows] = await pool.query(
+                `SELECT * FROM AttendanceSessions WHERE session_pin = ? AND (status = 'Active' OR status = 'active') ORDER BY id DESC LIMIT 1`,
+                [pin]
+            );
+            sessions = rows;
+        }
 
         const sessionRecord = (sessions && sessions.length > 0) ? sessions[0] : null;
 
-        console.log("DB SESSION DATA:", sessionRecord);
-
         if (!sessionRecord) {
-            console.log("SESSION ID NOT FOUND IN DB:", sessionId);
             return res.status(404).json({
                 success: false,
                 status: 'fail',
-                error: "Session ID not found in DB",
-                message: "Session ID not found in DB"
+                message: pin ? "No active session found with this PIN." : "Attendance session not found."
             });
         }
 
         const dbStatus = sessionRecord.status ? String(sessionRecord.status) : '';
         const dbToken = sessionRecord.qr_code_hash || sessionRecord.qr_token || '';
+        const dbPin = sessionRecord.session_pin || '';
 
         if (dbStatus.toLowerCase() !== 'active') {
-            console.log("STATUS MISMATCH: DB status =", dbStatus, " | EXPECTED = active");
-        }
-
-        if (dbToken !== String(qrToken)) {
-            console.log("TOKEN MISMATCH: DB =", dbToken, " | REQ =", qrToken);
-        }
-
-        if (dbStatus.toLowerCase() !== 'active' || dbToken !== String(qrToken)) {
             return res.status(400).json({
                 success: false,
                 status: 'fail',
-                message: "Attendance session is inactive or QR token is invalid."
+                message: "Attendance session is inactive or expired."
             });
         }
 
-        // Check if session has expired based on expiration timestamp
-        if (new Date() > new Date(sessionRecord.expires_at)) {
-            console.log("SESSION EXPIRED IN DB:", sessionRecord.expires_at);
-            await pool.query("UPDATE AttendanceSessions SET status = 'Expired' WHERE id = ?", [sessionId]);
+        let isMatch = false;
+        let method = 'QR';
+        if (pin && dbPin && dbPin === pin) {
+            isMatch = true;
+            method = 'PIN';
+        } else if (qrToken && dbToken && dbToken === String(qrToken).trim()) {
+            isMatch = true;
+            method = 'QR';
+        }
+
+        if (!isMatch) {
             return res.status(400).json({
                 success: false,
                 status: 'fail',
-                message: 'Attendance session is inactive or QR token is invalid.'
+                message: pin ? "Invalid 8-digit Classroom PIN." : "Attendance session is inactive or QR token is invalid."
             });
         }
+
+        const targetSessionId = sessionRecord.id;
 
         // Check if student has already scanned for this session
         const [existing] = await pool.query(
             'SELECT id FROM Attendance WHERE session_id = ? AND student_id = ?',
-            [sessionId, student_id]
+            [targetSessionId, student_id]
         );
 
         if (existing.length > 0) {

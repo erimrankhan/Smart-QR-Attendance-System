@@ -13,14 +13,32 @@ let isProcessingScan = false;
 let currentReportData = [];
 
 // Initialize on DOM Load
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Dismiss any hanging loaders immediately on page entrance
+    if (typeof hideLoading === 'function') hideLoading();
+    const hungLoader = document.getElementById('global-loader');
+    if (hungLoader) {
+        hungLoader.classList.remove('active');
+        hungLoader.style.display = 'none';
+        hungLoader.style.pointerEvents = 'none';
+    }
+
     checkAuth();
     initTheme();
     initNavigation();
-    loadDashboardData();
     initScannerControls();
     initFormListeners();
-    loadNotifications();
+
+    try {
+        await Promise.allSettled([
+            loadDashboardData(),
+            loadNotifications()
+        ]);
+    } catch (err) {
+        console.warn('Initial student data load warning:', err);
+    } finally {
+        if (typeof hideLoading === 'function') hideLoading();
+    }
 
     // Show login toast on right side when landing on dashboard
     if (sessionStorage.getItem('justLoggedIn') === 'true') {
@@ -61,10 +79,24 @@ function checkAuth() {
 
         const nameEl = document.getElementById('student-name-display');
         const enrollEl = document.getElementById('student-enrollment-display');
+        const sidebarNameEl = document.getElementById('sidebar-student-name');
+        const sidebarEnrollEl = document.getElementById('sidebar-student-enrollment');
+        const sidebarSemEl = document.getElementById('sidebar-student-semester');
+        const sidebarStatusEl = document.getElementById('sidebar-student-status');
 
         const displayName = user.name || user.enrollment_no || 'Student';
         if (nameEl) nameEl.textContent = displayName;
         if (enrollEl) enrollEl.textContent = `Enrollment: ${user.enrollment_no || 'N/A'}`;
+        if (sidebarNameEl) sidebarNameEl.textContent = displayName;
+        if (sidebarEnrollEl) sidebarEnrollEl.textContent = user.enrollment_no || 'EN2026-0000';
+        if (sidebarSemEl) {
+            const semNum = user.semester_id || user.semester || 1;
+            sidebarSemEl.textContent = `Sem ${semNum}`;
+        }
+        if (sidebarStatusEl) {
+            const statusText = user.status || 'Active';
+            sidebarStatusEl.innerHTML = `<span class="status-pulse-dot"></span> ${statusText} Student`;
+        }
 
         updateTopbarAvatar(user.profile_pic, displayName);
 
@@ -74,38 +106,42 @@ function checkAuth() {
 }
 
 /**
- * Reusable Topbar Avatar Synchronizer
+ * Reusable Topbar & Sidebar Avatar Synchronizer
  */
 function updateTopbarAvatar(photoUrl, name) {
     const avatarEl = document.getElementById('topbarAvatarContainer') || document.getElementById('student-avatar');
     const sidebarAvatarEl = document.getElementById('sidebarAvatarContainer');
     const sidebarNameEl = document.getElementById('sidebar-student-name');
 
-    const displayName = name || 'My Profile';
+    const displayName = name || 'Student';
     if (sidebarNameEl) sidebarNameEl.textContent = displayName;
 
     if (photoUrl) {
         const fullUrl = photoUrl.startsWith('http') ? photoUrl : `${SERVER_URL}${photoUrl}`;
-        const imgHtml = `<img src="${fullUrl}" class="avatar-img" alt="${name || 'Student'}" style="width: 100%; height: 100%; object-fit: cover;">`;
+        const imgHtml = `<img src="${fullUrl}" class="avatar-img" alt="${displayName}" style="width: 100%; height: 100%; object-fit: cover;">`;
         if (avatarEl) avatarEl.innerHTML = imgHtml;
         if (sidebarAvatarEl) sidebarAvatarEl.innerHTML = imgHtml;
     } else {
-        const initial = (name && name.trim()) ? name.trim().charAt(0).toUpperCase() : 'S';
+        const initial = (displayName && displayName.trim()) ? displayName.trim().charAt(0).toUpperCase() : 'S';
         if (avatarEl) avatarEl.textContent = initial;
-        if (sidebarAvatarEl) sidebarAvatarEl.textContent = initial;
+        if (sidebarAvatarEl) sidebarAvatarEl.innerHTML = `<span id="sidebarAvatarInitial">${initial}</span>`;
     }
 }
 
 function getAuthHeaders() {
-    const token = localStorage.getItem('studentToken') || localStorage.getItem('token');
-    return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+    const rawToken = localStorage.getItem('studentToken') || localStorage.getItem('token');
+    const token = (rawToken && rawToken !== 'null' && rawToken !== 'undefined') ? rawToken.trim() : '';
+    const headers = {
+        'Content-Type': 'application/json'
     };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
 }
 
 function redirectToLogin() {
-    window.location.href = '/attendance/student/login.html';
+    window.location.href = 'login.html';
 }
 
 /**
@@ -183,39 +219,114 @@ function updateThemeIcon(theme) {
 
 /**
  * --------------------------------------------------------------------------
- * 4. VIEW NAVIGATION ENGINE
+ * 4. SLIDE-IN NAVIGATION DRAWER CONTROLLER (EVENT DELEGATION)
  * --------------------------------------------------------------------------
  */
+function initSidebarDrawer() {
+    const sidebar = document.querySelector('.sidebar') || document.getElementById('sidebar');
+    let backdrop = document.getElementById('sidebarBackdrop') || document.querySelector('.sidebar-backdrop');
+
+    if (!backdrop) {
+        backdrop = document.createElement('div');
+        backdrop.id = 'sidebarBackdrop';
+        backdrop.className = 'sidebar-backdrop';
+        document.body.appendChild(backdrop);
+    }
+
+    function toggleSidebar(e) {
+        if (e && e.preventDefault) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        if (sidebar) {
+            sidebar.classList.toggle('show-sidebar');
+            sidebar.classList.toggle('sidebar-open');
+            sidebar.classList.toggle('active');
+            sidebar.classList.toggle('open');
+        }
+        if (backdrop) {
+            backdrop.classList.toggle('active');
+            backdrop.classList.toggle('open');
+        }
+        const isOpen = sidebar && (sidebar.classList.contains('show-sidebar') || sidebar.classList.contains('active'));
+        document.body.style.overflow = isOpen ? 'hidden' : '';
+    }
+    window.toggleSidebar = toggleSidebar;
+    window.toggleMobileSidebar = toggleSidebar;
+
+    function openSidebar() {
+        if (sidebar) {
+            sidebar.classList.add('show-sidebar', 'sidebar-open', 'active', 'open');
+        }
+        if (backdrop) {
+            backdrop.classList.add('active', 'open');
+        }
+        document.body.style.overflow = 'hidden';
+    }
+    window.openSidebar = openSidebar;
+
+    function closeSidebar(e) {
+        if (e && e.preventDefault) e.preventDefault();
+        if (sidebar) {
+            sidebar.classList.remove('show-sidebar', 'sidebar-open', 'active', 'open');
+        }
+        if (backdrop) {
+            backdrop.classList.remove('active', 'open');
+        }
+        document.body.style.overflow = '';
+    }
+    window.closeSidebar = closeSidebar;
+    window.closeMobileSidebar = closeSidebar;
+
+    // Handle all hamburger and close button variations via robust event delegation
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('#sidebarToggleBtn, #hamburgerBtn, #mobileMenuToggle, .menu-toggle, .hamburger-btn, .sidebar-toggle-btn');
+        if (btn) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleSidebar();
+            return;
+        }
+
+        const closeBtn = e.target.closest('#sidebarCloseBtn, #mobileSidebarClose, .sidebar-close-btn, .mobile-sidebar-close');
+        if (closeBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeSidebar();
+            return;
+        }
+    });
+
+    // Close when tapping backdrop
+    backdrop.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeSidebar();
+    });
+
+    // Keyboard ESC key support to close drawer
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' || e.key === 'Esc') {
+            closeSidebar();
+        }
+    });
+}
+
 function initNavigation() {
-    const sidebar = document.getElementById('sidebar');
-    const mobileToggle = document.getElementById('mobileMenuToggle');
-    const mobileOverlay = document.getElementById('mobileOverlay');
-
-    const toggleMobileMenu = () => {
-        if (sidebar) sidebar.classList.toggle('open');
-        if (mobileOverlay) mobileOverlay.classList.toggle('active');
-    };
-
-    const closeMobileMenu = () => {
-        if (sidebar) sidebar.classList.remove('open');
-        if (mobileOverlay) mobileOverlay.classList.remove('active');
-    };
-
-    if (mobileToggle) mobileToggle.addEventListener('click', toggleMobileMenu);
-    if (mobileOverlay) mobileOverlay.addEventListener('click', closeMobileMenu);
+    initSidebarDrawer();
 
     const navItems = document.querySelectorAll('.nav-item[data-view]');
     navItems.forEach(item => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
             const viewId = item.getAttribute('data-view');
-            closeMobileMenu();
+            if (typeof window.closeSidebar === 'function') window.closeSidebar();
             switchView(viewId);
         });
     });
 
     const handleLogout = (e) => {
         if (e) e.preventDefault();
+        if (typeof window.closeSidebar === 'function') window.closeSidebar();
         
         if (typeof showConfirmModal === 'function') {
             showConfirmModal(
@@ -316,7 +427,7 @@ function switchView(viewId) {
         if (titleEl) titleEl.textContent = 'Course Study Materials';
         if (subtitleEl) subtitleEl.textContent = 'Download lecture notes, PPTs, and study materials shared for your course and term';
         stopCameraScan();
-        fetchStudentMaterials();
+        loadStudyMaterials();
     }
 }
 
@@ -325,59 +436,116 @@ function switchView(viewId) {
  * MODULE 6: COURSE STUDY MATERIALS & NOTES
  * --------------------------------------------------------------------------
  */
-async function fetchStudentMaterials() {
-    const tbody = document.getElementById('student-materials-tbody');
-    if (!tbody) return;
+async function loadStudyMaterials() {
+    const tableContainer = document.getElementById('student-materials-tbody') || 
+                           document.querySelector('#materialsTableBody') || 
+                           document.querySelector('#materials-view tbody');
+    const token = localStorage.getItem('studentToken') || localStorage.getItem('token');
+
+    if (!tableContainer) return;
+
+    if (!token) {
+        tableContainer.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 24px; color: var(--accent-rose, #ef4444);">
+                    <i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px;"></i> Authentication required. Please log in again.
+                </td>
+            </tr>
+        `;
+        return;
+    }
 
     try {
-        const userStr = localStorage.getItem('studentUser') || localStorage.getItem('user');
-        const user = userStr ? JSON.parse(userStr) : {};
+        tableContainer.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted, #94a3b8);">
+                    <i class="fa-solid fa-spinner fa-spin" style="margin-right: 8px;"></i> Loading course materials...
+                </td>
+            </tr>
+        `;
 
-        const course_id = user.course_id;
-        const semester_id = user.semester_id;
-
-        let queryParams = '';
-        if (course_id && semester_id) {
-            queryParams = `?course_id=${course_id}&semester_id=${semester_id}`;
-        }
-
-        const token = localStorage.getItem('studentToken') || localStorage.getItem('token');
-        const response = await fetch(`${SERVER_URL}/api/materials/student${queryParams}`, {
+        const response = await fetch(`${SERVER_URL}/api/resources/my-resources`, {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
             }
         });
+
         const resData = await response.json();
+        console.log("Materials fetched:", resData);
 
         if (response.ok && resData.status === 'success') {
-            const materials = resData.data;
+            const materials = Array.isArray(resData.data) ? resData.data : (resData.resources || []);
 
-            if (materials.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">No study materials uploaded for your course and semester yet.</td></tr>`;
+            if (materials.length > 0) {
+                tableContainer.innerHTML = materials.map(item => {
+                    const downloadUrl = item.downloadUrl || item.download_url || 
+                                        (item.file_path ? (item.file_path.startsWith('http') ? item.file_path : `${SERVER_URL}${item.file_path}`) : '#');
+                    const format = item.resource_type ? item.resource_type.toUpperCase() : 'DOC';
+                    const uploadDate = item.created_at || item.uploaded_at || item.upload_date;
+                    const dateDisplay = uploadDate ? new Date(uploadDate).toLocaleDateString() : 'N/A';
+                    const subjectDisplay = item.subject_name ? `${item.subject_name} ${item.subject_code ? `(${item.subject_code})` : ''}` : (item.subject_code || 'General');
+                    const facultyDisplay = item.faculty_name || item.teacher_name || 'Faculty Member';
+
+                    return `
+                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+                            <td style="padding: 14px 16px;">
+                                <div style="font-weight: 600; color: #fff;">${item.title}</div>
+                                <small style="color: #94a3b8; font-size: 11px;"><i class="fa-solid fa-file-arrow-down" style="margin-right: 4px;"></i>Format: ${format}</small>
+                            </td>
+                            <td style="padding: 14px 16px; color: #cbd5e1;">${subjectDisplay}</td>
+                            <td style="padding: 14px 16px; color: #cbd5e1;"><i class="fa-solid fa-user-tie" style="margin-right: 6px; font-size: 12px; color: #818cf8;"></i>${facultyDisplay}</td>
+                            <td style="padding: 14px 16px; color: #94a3b8;"><i class="fa-solid fa-calendar-days" style="margin-right: 6px; font-size: 12px;"></i>${dateDisplay}</td>
+                            <td style="padding: 14px 16px;">
+                                <a href="${downloadUrl}" target="_blank" download
+                                   style="background: #10b981; color: white; padding: 7px 14px; border-radius: 8px; text-decoration: none; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); transition: all 0.2s ease;">
+                                   <i class="fa-solid fa-download"></i> Download
+                                </a>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
             } else {
-                tbody.innerHTML = materials.map(m => `
+                tableContainer.innerHTML = `
                     <tr>
-                        <td><strong>${m.title}</strong></td>
-                        <td><span style="background: rgba(99, 102, 241, 0.15); color: var(--accent-primary); padding: 3px 10px; border-radius: 12px; font-size: 11.5px; font-weight: 700;">${m.subject_name} (${m.subject_code || ''})</span></td>
-                        <td>${m.faculty_name}</td>
-                        <td>${new Date(m.upload_date).toLocaleDateString()}</td>
-                        <td>
-                            <a href="${m.download_url}" download target="_blank" class="btn btn-primary" style="padding: 6px 14px; font-size: 12px; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-                                <i class="fa-solid fa-download"></i> Download
-                            </a>
+                        <td colspan="5" style="text-align: center; padding: 32px; color: #94a3b8;">
+                            <i class="fa-solid fa-folder-open" style="font-size: 28px; display: block; margin-bottom: 8px; opacity: 0.5;"></i>
+                            No study materials uploaded for your enrolled course/semester yet.
                         </td>
                     </tr>
-                `).join('');
+                `;
             }
         } else {
-            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #ef4444; padding: 24px;">${resData.message || 'Failed to load materials.'}</td></tr>`;
+            tableContainer.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 24px; color: #ef4444;">
+                        <i class="fa-solid fa-circle-exclamation" style="margin-right: 6px;"></i>
+                        ${resData.message || 'Failed to load study materials.'}
+                    </td>
+                </tr>
+            `;
         }
-    } catch (err) {
-        console.error('Error fetching student study materials:', err);
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #ef4444; padding: 24px;">Error connecting to server.</td></tr>`;
+    } catch (error) {
+        console.error('Error fetching study materials:', error);
+        tableContainer.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 24px; color: #ef4444;">
+                    <i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px;"></i>
+                    Failed to load study materials. Please check server connection.
+                </td>
+            </tr>
+        `;
     }
 }
 
+// Backward compatibility alias & initialization
+const fetchStudentMaterials = loadStudyMaterials;
+document.addEventListener('DOMContentLoaded', () => {
+    const materialsNav = document.querySelector('.nav-item[data-view="materials-view"]');
+    if (materialsNav) {
+        materialsNav.addEventListener('click', loadStudyMaterials);
+    }
+});
 /**
  * --------------------------------------------------------------------------
  * MODULE 1: DASHBOARD DATA & SUMMARY
@@ -386,10 +554,16 @@ async function fetchStudentMaterials() {
 async function loadDashboardData() {
     try {
         const response = await fetch(`${API_BASE_URL}/dashboard-summary`, { headers: getAuthHeaders() });
+        if (!response.ok && (response.status === 401 || response.status === 403)) {
+            console.warn('Session expired or unauthorized.');
+            redirectToLogin();
+            return;
+        }
+
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
-            const { student, todayStatus, stats, recentHistory } = resData.data;
+            const { student, todayStatus, stats, recentHistory } = resData.data || {};
 
             // Update Top Bar & Header Profile
             if (student) {
@@ -402,7 +576,7 @@ async function loadDashboardData() {
             // Update Today's Status Banner
             const titleBanner = document.getElementById('today-status-title');
             const subBanner = document.getElementById('today-status-subtitle');
-            if (titleBanner && subBanner) {
+            if (titleBanner && subBanner && todayStatus) {
                 if (todayStatus.marked) {
                     titleBanner.textContent = `✅ Marked Present: ${todayStatus.subject}`;
                     subBanner.textContent = `Attendance recorded at ${new Date(todayStatus.time).toLocaleTimeString()}`;
@@ -419,14 +593,16 @@ async function loadDashboardData() {
             const totalEl = document.getElementById('stat-total-classes');
             const attEl = document.getElementById('stat-attended-classes');
 
-            if (percEl) percEl.textContent = `${stats.attendancePercentage}%`;
-            if (totalEl) totalEl.textContent = stats.totalClasses;
-            if (attEl) attEl.textContent = stats.attendedClasses;
+            if (stats) {
+                if (percEl) percEl.textContent = `${stats.attendancePercentage || 0}%`;
+                if (totalEl) totalEl.textContent = stats.totalClasses || 0;
+                if (attEl) attEl.textContent = stats.attendedClasses || 0;
+            }
 
             // Update Recent Activity Table
             const recentTbody = document.getElementById('recent-attendance-tbody');
             if (recentTbody) {
-                if (recentHistory.length === 0) {
+                if (!recentHistory || recentHistory.length === 0) {
                     recentTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No attendance records found yet.</td></tr>`;
                 } else {
                     recentTbody.innerHTML = recentHistory.map(row => `
@@ -446,6 +622,8 @@ async function loadDashboardData() {
         }
     } catch (err) {
         console.error('Error loading dashboard summary:', err);
+    } finally {
+        if (typeof hideLoading === 'function') hideLoading();
     }
 }
 
@@ -460,7 +638,88 @@ function initScannerControls() {
 
     if (startBtn) startBtn.addEventListener('click', startCameraScan);
     if (stopBtn) stopBtn.addEventListener('click', stopCameraScan);
+
+    initPinAttendanceHandler();
 }
+
+function initPinAttendanceHandler() {
+    const pinForm = document.getElementById('pin-attendance-form');
+    if (pinForm) {
+        pinForm.addEventListener('submit', handlePinAttendanceSubmit);
+    }
+}
+
+async function handlePinAttendanceSubmit(e) {
+    if (e && e.preventDefault) e.preventDefault();
+
+    const pinInput = document.getElementById('studentPinInput');
+    const submitBtn = document.getElementById('submitPinBtn');
+    const feedbackMsg = document.getElementById('pin-feedback-msg');
+
+    const pin = pinInput ? pinInput.value.trim() : '';
+
+    if (!pin || pin.length !== 8 || isNaN(pin)) {
+        showToast('Please enter a valid 8-digit numeric PIN.', 'error');
+        if (feedbackMsg) {
+            feedbackMsg.textContent = '❌ Please enter a valid 8-digit numeric PIN.';
+            feedbackMsg.style.color = 'var(--accent-rose)';
+        }
+        return;
+    }
+
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
+    }
+    if (feedbackMsg) {
+        feedbackMsg.textContent = 'Verifying PIN with live classroom session...';
+        feedbackMsg.style.color = 'var(--accent-teal)';
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/mark-attendance`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ pin: pin })
+        });
+        const resData = await response.json();
+
+        if (response.ok && (resData.status === 'success' || resData.success === true)) {
+            showToast(resData.message || 'Attendance marked successfully via 8-Digit PIN!', 'success');
+            if (feedbackMsg) {
+                feedbackMsg.textContent = `✅ ${resData.message || 'Attendance recorded successfully!'}`;
+                feedbackMsg.style.color = 'var(--accent-emerald)';
+            }
+            if (pinInput) pinInput.value = '';
+
+            // Refresh dashboard data & switch to dashboard view
+            setTimeout(() => {
+                loadDashboardData();
+                switchView('dashboard-view');
+            }, 1200);
+        } else {
+            const errMsg = resData.message || 'Failed to verify PIN. Please check screen.';
+            showToast(errMsg, 'error');
+            if (feedbackMsg) {
+                feedbackMsg.textContent = `❌ ${errMsg}`;
+                feedbackMsg.style.color = 'var(--accent-rose)';
+            }
+        }
+    } catch (err) {
+        console.error('PIN Attendance Error:', err);
+        showToast('Network error while verifying PIN. Please try again.', 'error');
+        if (feedbackMsg) {
+            feedbackMsg.textContent = '❌ Connection failed. Check server connection.';
+            feedbackMsg.style.color = 'var(--accent-rose)';
+        }
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit PIN';
+        }
+    }
+}
+window.handlePinAttendanceSubmit = handlePinAttendanceSubmit;
 
 function startCameraScan() {
     const feedbackEl = document.getElementById('scan-feedback-message');
@@ -678,23 +937,39 @@ async function loadProfile() {
 
             const nameEl = document.getElementById('prof-name');
             const enrollEl = document.getElementById('prof-enrollment');
-            const emailEl = document.getElementById('prof-email');
-            const rollEl = document.getElementById('prof-roll');
-            const deptEl = document.getElementById('prof-dept');
-            const courseEl = document.getElementById('prof-course');
-            const secEl = document.getElementById('prof-section');
+            const emailEl = document.getElementById('prof-email') || document.getElementById('acadEmail');
+            const rollEl = document.getElementById('prof-roll') || document.getElementById('acadRoll');
+            const deptEl = document.getElementById('prof-dept') || document.getElementById('acadDept');
+            const courseEl = document.getElementById('acadCourse') || document.getElementById('prof-course');
+            const semEl = document.getElementById('acadSemester') || document.getElementById('prof-semester');
+            const secEl = document.getElementById('prof-section') || document.getElementById('acadSection');
             const secHeaderEl = document.getElementById('prof-header-section');
-            const phoneEl = document.getElementById('prof-phone');
+            const phoneEl = document.getElementById('prof-phone') || document.getElementById('acadPhone');
 
             if (nameEl) nameEl.textContent = p.name;
             if (enrollEl) enrollEl.textContent = `Enrollment No: ${p.enrollment_no}`;
             if (emailEl) emailEl.textContent = p.email || '-';
             if (rollEl) rollEl.textContent = p.roll_no || 'N/A';
             if (deptEl) deptEl.textContent = p.department_name || 'General Academic';
-            if (courseEl) courseEl.textContent = `${p.course_name || 'Degree Program'} (Sem ${p.semester_number || 1})`;
+            if (courseEl) courseEl.textContent = p.course_name || '-';
+            if (semEl) {
+                const semNum = p.semester_id || p.semester_number || p.semester || '1';
+                semEl.textContent = `Semester ${semNum}`;
+            }
             if (secEl) secEl.textContent = p.section_name ? `Section ${p.section_name}` : 'Unassigned';
             if (secHeaderEl) secHeaderEl.textContent = p.section_name ? `Section ${p.section_name}` : 'Unassigned';
             if (phoneEl) phoneEl.textContent = p.phone || 'Not Provided';
+
+            // Sync Sidebar Profile Header Card
+            const sidebarNameEl = document.getElementById('sidebar-student-name');
+            const sidebarEnrollEl = document.getElementById('sidebar-student-enrollment');
+            const sidebarSemEl = document.getElementById('sidebar-student-semester');
+            const sidebarStatusEl = document.getElementById('sidebar-student-status');
+
+            if (sidebarNameEl) sidebarNameEl.textContent = p.name;
+            if (sidebarEnrollEl) sidebarEnrollEl.textContent = p.enrollment_no || 'N/A';
+            if (sidebarSemEl) sidebarSemEl.textContent = `Sem ${p.semester_number || 1}`;
+            if (sidebarStatusEl) sidebarStatusEl.innerHTML = `<span class="status-pulse-dot"></span> Active Student`;
 
             const imgPreview = document.getElementById('profile-img-preview');
             if (imgPreview) {
@@ -731,10 +1006,7 @@ async function loadLeaveHistory() {
     if (!tbody) return;
 
     try {
-        let response = await fetch(`${API_BASE_URL}/student/leaves`, { headers: getAuthHeaders() });
-        if (!response.ok && response.status === 404) {
-            response = await fetch(`${API_BASE_URL}/leaves`, { headers: getAuthHeaders() });
-        }
+        const response = await fetch(`${API_BASE_URL}/leaves`, { headers: getAuthHeaders() });
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success') {
@@ -799,55 +1071,167 @@ async function loadLeaveHistory() {
     }
 }
 
-async function loadNotifications() {
+async function loadStudentNotifications() {
     const listContainer = document.getElementById('notifications-list');
+    const dropdownList = document.getElementById('notificationDropdownList');
     const alertCountEl = document.getElementById('leave-stat-alerts');
-    if (!listContainer) return;
+    const badgeEl = document.getElementById('notif-badge') || document.getElementById('notificationCount') || document.getElementById('notificationDot');
+    const dropdownBadgeEl = document.getElementById('notifDropdownBadge');
+    const modalBody = document.getElementById('systemNotifModalBody');
 
     try {
         const response = await fetch(`${API_BASE_URL}/notifications`, { headers: getAuthHeaders() });
         const resData = await response.json();
 
-        if (response.ok && resData.status === 'success') {
-            const { notifications, unreadCount } = resData.data;
+        if (response.ok && (resData.success || resData.status === 'success')) {
+            const dataObj = resData.data || {};
+            const notifications = Array.isArray(dataObj) ? dataObj : (dataObj.notifications || resData.notifications || []);
+            const unreadCount = dataObj.unreadCount !== undefined ? dataObj.unreadCount : notifications.length;
 
-            if (alertCountEl) alertCountEl.textContent = unreadCount !== undefined ? unreadCount : notifications.length;
+            if (alertCountEl) alertCountEl.textContent = unreadCount;
+            if (dropdownBadgeEl) dropdownBadgeEl.textContent = unreadCount;
 
-            if (notifications.length === 0) {
-                listContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 24px;">No new notifications or system alerts.</div>`;
-            } else {
-                listContainer.innerHTML = notifications.map(n => {
-                    let borderAccent = '#10b981';
-                    let iconClass = 'fa-circle-check';
-                    let iconBg = 'rgba(16, 185, 129, 0.15)';
-                    let iconColor = '#10b981';
+            if (badgeEl) {
+                if (unreadCount > 0) {
+                    badgeEl.textContent = unreadCount > 9 ? '9+' : unreadCount;
+                    badgeEl.style.display = 'inline-flex';
+                } else {
+                    badgeEl.style.display = 'none';
+                }
+            }
 
-                    if (n.type === 'warning' || n.type === 'danger') {
-                        borderAccent = '#f43f5e';
-                        iconClass = 'fa-triangle-exclamation';
-                        iconBg = 'rgba(244, 63, 94, 0.15)';
-                        iconColor = '#f43f5e';
-                    } else if (n.type === 'info') {
-                        borderAccent = '#6366f1';
-                        iconClass = 'fa-info-circle';
-                        iconBg = 'rgba(99, 102, 241, 0.15)';
-                        iconColor = '#6366f1';
-                    }
+            // Render Full Card for Tab & Modal
+            const renderNotificationItem = (n) => {
+                const priority = (n.priority || n.type || 'info').toLowerCase();
+                let borderAccent = '#6366f1';
+                let iconClass = 'fa-info-circle';
+                let iconBg = 'rgba(99, 102, 241, 0.15)';
+                let iconColor = '#6366f1';
+                let badgeLabel = 'Notice';
+                let badgeStyle = 'background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3);';
 
-                    return `
-                        <div style="display: flex; gap: 12px; padding: 14px; background: rgba(15, 23, 42, 0.65); border: 1px solid var(--glass-border); border-radius: 14px; border-left: 4px solid ${borderAccent}; transition: transform 0.2s ease;">
-                            <div style="width: 36px; height: 36px; border-radius: 10px; background: ${iconBg}; color: ${iconColor}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 16px;">
-                                <i class="fa-solid ${iconClass}"></i>
+                if (priority === 'success') {
+                    borderAccent = '#10b981';
+                    iconClass = 'fa-circle-check';
+                    iconBg = 'rgba(16, 185, 129, 0.15)';
+                    iconColor = '#10b981';
+                    badgeLabel = 'Exam / Assignment';
+                    badgeStyle = 'background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3);';
+                } else if (priority === 'warning' || priority === 'urgent' || priority === 'danger' || priority === 'high') {
+                    borderAccent = '#f43f5e';
+                    iconClass = 'fa-triangle-exclamation';
+                    iconBg = 'rgba(244, 63, 94, 0.15)';
+                    iconColor = '#f43f5e';
+                    badgeLabel = 'Urgent Alert';
+                    badgeStyle = 'background: rgba(244, 63, 94, 0.15); color: var(--accent-rose); border: 1px solid rgba(244, 63, 94, 0.3);';
+                }
+
+                const facultyInfo = n.faculty_name ? `<span style="display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-user-tie"></i> ${n.faculty_name}</span>` : '';
+                const subjectInfo = n.subject_name ? `<span style="display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-book-open"></i> ${n.subject_name}</span>` : '';
+                const dateStr = n.created_at ? new Date(n.created_at).toLocaleString() : 'Recent';
+
+                return `
+                    <div style="display: flex; gap: 12px; padding: 14px; background: rgba(15, 23, 42, 0.65); border: 1px solid var(--glass-border); border-radius: 14px; border-left: 4px solid ${borderAccent}; transition: transform 0.2s ease;">
+                        <div style="width: 36px; height: 36px; border-radius: 10px; background: ${iconBg}; color: ${iconColor}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 16px;">
+                            <i class="fa-solid ${iconClass}"></i>
+                        </div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 4px;">
+                                <span style="font-size: 13px; color: var(--text-primary); font-weight: 700;">${n.title || n.subject_name || 'Class Notification'}</span>
+                                <span style="${badgeStyle} padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: 700; text-transform: uppercase;">${badgeLabel}</span>
                             </div>
-                            <div style="flex: 1;">
-                                <div style="font-size: 13px; color: var(--text-primary); font-weight: 600; line-height: 1.4;">${n.message}</div>
-                                <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px; display: flex; align-items: center; gap: 6px;">
-                                    <i class="fa-solid fa-clock" style="font-size: 10px;"></i> ${new Date(n.created_at).toLocaleString()}
+                            <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; word-break: break-word;">${n.message}</div>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-top: 1px dashed var(--glass-border); padding-top: 6px;">
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    ${facultyInfo}
+                                    ${subjectInfo}
                                 </div>
+                                <span style="display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-clock" style="font-size: 10px;"></i> ${dateStr}</span>
                             </div>
                         </div>
+                    </div>
+                `;
+            };
+
+            // Render Compact Card for Bell Dropdown Popup
+            const renderDropdownItem = (n) => {
+                const priority = (n.priority || n.type || 'info').toLowerCase();
+                let iconClass = 'fa-info-circle';
+                let iconBg = 'rgba(99, 102, 241, 0.15)';
+                let iconColor = '#818cf8';
+                let badgeLabel = 'Notice';
+                let badgeStyle = 'background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3);';
+
+                if (priority === 'success') {
+                    iconClass = 'fa-circle-check';
+                    iconBg = 'rgba(16, 185, 129, 0.15)';
+                    iconColor = 'var(--accent-emerald)';
+                    badgeLabel = 'Exam / Notice';
+                    badgeStyle = 'background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3);';
+                } else if (priority === 'warning' || priority === 'urgent' || priority === 'danger' || priority === 'high') {
+                    iconClass = 'fa-triangle-exclamation';
+                    iconBg = 'rgba(244, 63, 94, 0.15)';
+                    iconColor = 'var(--accent-rose)';
+                    badgeLabel = 'Urgent Alert';
+                    badgeStyle = 'background: rgba(244, 63, 94, 0.15); color: var(--accent-rose); border: 1px solid rgba(244, 63, 94, 0.3);';
+                }
+
+                const titleText = n.title || (n.subject_name ? `[${n.subject_name}] Announcement` : 'Class Announcement');
+                const facultyText = n.faculty_name ? `<span style="display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-user-tie" style="font-size: 10px;"></i> ${n.faculty_name}</span>` : '';
+                const dateStr = n.created_at ? new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' + new Date(n.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Recent';
+
+                return `
+                    <div class="notif-item-card" onclick="navigateToLeavesAndAlerts()">
+                        <div class="notif-item-icon" style="background: ${iconBg}; color: ${iconColor};">
+                            <i class="fa-solid ${iconClass}"></i>
+                        </div>
+                        <div class="notif-item-content">
+                            <div class="notif-item-top">
+                                <span class="notif-item-title" title="${titleText}">${titleText}</span>
+                                <span class="notif-item-badge" style="${badgeStyle}">${badgeLabel}</span>
+                            </div>
+                            <div class="notif-item-msg">${n.message}</div>
+                            <div class="notif-item-meta">
+                                ${facultyText}
+                                <span style="display: inline-flex; align-items: center; gap: 4px; margin-left: auto;">
+                                    <i class="fa-regular fa-clock" style="font-size: 10px;"></i> ${dateStr}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            };
+
+            // 1. Dropdown Popup List
+            if (dropdownList) {
+                if (notifications.length === 0) {
+                    dropdownList.innerHTML = `
+                        <div class="notif-empty-state">
+                            <i class="fa-regular fa-bell-slash" style="font-size: 26px; color: var(--text-muted); margin-bottom: 8px;"></i>
+                            <p style="margin: 0; color: var(--text-muted); font-size: 13px;">No new notifications</p>
+                        </div>
                     `;
-                }).join('');
+                } else {
+                    dropdownList.innerHTML = notifications.map(renderDropdownItem).join('');
+                }
+            }
+
+            // 2. Main Tab List
+            if (listContainer) {
+                if (notifications.length === 0) {
+                    listContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 24px;">No new notifications or system alerts.</div>`;
+                } else {
+                    listContainer.innerHTML = notifications.map(renderNotificationItem).join('');
+                }
+            }
+
+            // 3. Modal Body
+            if (modalBody) {
+                if (notifications.length === 0) {
+                    modalBody.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 24px;">No new notifications or system alerts.</div>`;
+                } else {
+                    modalBody.innerHTML = notifications.map(renderNotificationItem).join('');
+                }
             }
         }
     } catch (err) {
@@ -855,15 +1239,85 @@ async function loadNotifications() {
     }
 }
 
-async function markAllNotificationsRead() {
+// Backward compatibility alias
+const loadNotifications = loadStudentNotifications;
+window.loadStudentNotifications = loadStudentNotifications;
+window.loadNotifications = loadStudentNotifications;
+
+/**
+ * Toggle Bell Notification Dropdown Popup
+ */
+function toggleNotificationDropdown(e) {
+    if (e) {
+        e.stopPropagation();
+        e.preventDefault();
+    }
+    const dropdown = document.getElementById('notificationDropdown');
+    if (!dropdown) return;
+
+    const isVisible = dropdown.style.display === 'flex' || dropdown.style.display === 'block';
+    if (isVisible) {
+        dropdown.style.display = 'none';
+    } else {
+        dropdown.style.display = 'flex';
+        loadStudentNotifications();
+    }
+}
+window.toggleNotificationDropdown = toggleNotificationDropdown;
+window.toggleSystemNotificationModal = toggleNotificationDropdown;
+
+/**
+ * Navigate to Leaves & Alerts View from Dropdown
+ */
+function navigateToLeavesAndAlerts() {
+    const dropdown = document.getElementById('notificationDropdown');
+    if (dropdown) dropdown.style.display = 'none';
+
+    if (typeof switchView === 'function') {
+        switchView('leaves-alerts-view');
+    } else {
+        const navBtn = document.getElementById('nav-leaves') || document.querySelector('[data-view="leaves-alerts-view"]');
+        if (navBtn) navBtn.click();
+    }
+}
+window.navigateToLeavesAndAlerts = navigateToLeavesAndAlerts;
+
+// Close dropdown on outside click
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('notificationDropdown');
+    const bellBtn = document.getElementById('notification-bell');
+    if (!dropdown || dropdown.style.display === 'none') return;
+
+    if (!dropdown.contains(e.target) && (!bellBtn || !bellBtn.contains(e.target))) {
+        dropdown.style.display = 'none';
+    }
+});
+
+/**
+ * Mark All Notifications as Read
+ */
+async function markAllNotificationsRead(e) {
+    if (e) {
+        e.stopPropagation();
+        e.preventDefault();
+    }
     try {
         await fetch(`${API_BASE_URL}/notifications/read`, { method: 'POST', headers: getAuthHeaders() });
         showToast('Notifications marked as read.');
-        loadNotifications();
+
+        const badgeEl = document.getElementById('notif-badge') || document.getElementById('notificationCount');
+        const dropdownBadgeEl = document.getElementById('notifDropdownBadge');
+        const alertCountEl = document.getElementById('leave-stat-alerts');
+        if (badgeEl) badgeEl.style.display = 'none';
+        if (dropdownBadgeEl) dropdownBadgeEl.textContent = '0';
+        if (alertCountEl) alertCountEl.textContent = '0';
+
+        loadStudentNotifications();
     } catch (err) {
         showToast('Error marking notifications as read.', 'error');
     }
 }
+window.markAllNotificationsRead = markAllNotificationsRead;
 
 /**
  * --------------------------------------------------------------------------
@@ -1026,18 +1480,11 @@ function initFormListeners() {
             }
 
             try {
-                let response = await fetch(`${API_BASE_URL}/student/leaves`, {
+                const response = await fetch(`${API_BASE_URL}/leaves`, {
                     method: 'POST',
                     headers: getAuthHeaders(),
                     body: JSON.stringify({ start_date, end_date, reason })
                 });
-                if (!response.ok && response.status === 404) {
-                    response = await fetch(`${API_BASE_URL}/leaves`, {
-                        method: 'POST',
-                        headers: getAuthHeaders(),
-                        body: JSON.stringify({ start_date, end_date, reason })
-                    });
-                }
                 const resData = await response.json();
 
                 if (response.ok && resData.status === 'success') {

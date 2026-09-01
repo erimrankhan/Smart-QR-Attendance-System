@@ -6,13 +6,47 @@ const { verifyToken, authorizeRoles } = require('../middlewares/authMiddleware')
 // Protect all resource routes with JWT verification
 router.use(verifyToken);
 
-// Teacher & Faculty Upload Endpoint
-router.post('/upload', authorizeRoles('Teacher', 'Faculty'), resourceController.uploadMiddleware.single('file'), resourceController.uploadResource);
+// 1. Teacher & Faculty Upload Endpoint
+router.post(
+    '/upload',
+    authorizeRoles('Teacher', 'Faculty'),
+    resourceController.uploadMiddleware.single('file'),
+    resourceController.uploadResource
+);
 
-// Class Resources Endpoint
-router.get('/class/:class_id', resourceController.getClassResources);
+// 2. Teacher Uploaded Resources List Endpoint
+router.get(
+    '/teacher-list',
+    authorizeRoles('Teacher', 'Faculty'),
+    resourceController.getTeacherResources
+);
+router.get(
+    '/teacher',
+    authorizeRoles('Teacher', 'Faculty'),
+    resourceController.getTeacherResources
+);
 
-// Student Study Materials Endpoint
-router.get('/my-resources', authorizeRoles('Student'), resourceController.getStudentResources);
+// 3. Class Specific Resources Endpoint
+router.get(
+    '/class/:class_id',
+    resourceController.getClassResources
+);
+
+// 4. Student Study Materials Endpoints
+router.get(
+    '/my-resources',
+    authorizeRoles('Student', 'Admin', 'Teacher', 'Faculty'),
+    resourceController.getStudentMaterials
+);
+router.get(
+    '/student/materials',
+    authorizeRoles('Student', 'Admin', 'Teacher', 'Faculty'),
+    resourceController.getStudentMaterials
+);
+router.get(
+    '/student',
+    authorizeRoles('Student', 'Admin', 'Teacher', 'Faculty'),
+    resourceController.getStudentMaterials
+);
 
 module.exports = router;

@@ -79,6 +79,7 @@ body {
     background: rgba(11, 15, 25, 0.85);
     backdrop-filter: blur(12px);
     display: none;
+    pointer-events: none;
     align-items: center;
     justify-content: center;
     flex-direction: column;
@@ -87,7 +88,8 @@ body {
 }
 
 #global-loader.active {
-    display: flex;
+    display: flex !important;
+    pointer-events: auto !important;
 }
 
 .spinner {
@@ -110,42 +112,77 @@ body {
     letter-spacing: 0.5px;
 }
 
-/* Reusable Modal Dialog */
-#global-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.65);
-    backdrop-filter: blur(8px);
+/* ==========================================================================
+   GLOBAL MODALS & LOGOUT CONFIRMATION DIALOGS (ELEVATED Z-INDEX)
+   ========================================================================== */
+#global-modal,
+.logout-modal,
+.modal-backdrop,
+.custom-modal-overlay,
+.confirm-modal-overlay,
+.modal-overlay,
+#logoutModal,
+#confirmModal {
+    position: fixed !important;
+    inset: 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(0, 0, 0, 0.75) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
     display: none;
+    pointer-events: none;
     align-items: center;
     justify-content: center;
     padding: 20px;
-    z-index: 99990;
+    z-index: 1000000 !important; /* Must be higher than sidebar drawer (99999) */
 }
 
-#global-modal.active {
-    display: flex;
+#global-modal.active,
+.logout-modal.active,
+.custom-modal-overlay.active,
+.confirm-modal-overlay.active,
+.modal-overlay.active,
+#logoutModal.active,
+#confirmModal.active {
+    display: flex !important;
+    pointer-events: auto !important;
     animation: fadeIn 0.2s ease;
 }
 
-.modal-content {
-    background: var(--glass-card);
-    backdrop-filter: blur(20px);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-lg);
-    width: 100%;
-    max-width: 440px;
-    padding: 28px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+.modal-content,
+.logout-modal-content,
+.modal-dialog,
+.modal-container,
+.confirm-modal-box,
+#logoutModal .modal-box {
+    position: relative !important;
+    z-index: 1000001 !important;
+    background: var(--glass-card, rgba(30, 41, 59, 0.95)) !important;
+    backdrop-filter: blur(24px) !important;
+    -webkit-backdrop-filter: blur(24px) !important;
+    border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.15)) !important;
+    border-radius: var(--radius-lg, 20px);
+    width: 90% !important;
+    max-width: 440px !important;
+    margin: auto !important;
+    padding: 28px !important;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75), 0 0 30px rgba(0, 0, 0, 0.5) !important;
+    animation: scaleUpModal 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes scaleUpModal {
+    from { opacity: 0; transform: scale(0.92); }
+    to { opacity: 1; transform: scale(1); }
 }
 
 .modal-header h3 {
     font-size: 18px;
     font-weight: 800;
     margin-bottom: 8px;
+    color: var(--text-primary);
 }
 
 .modal-body {

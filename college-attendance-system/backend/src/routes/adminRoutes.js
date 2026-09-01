@@ -24,6 +24,8 @@ router.delete('/teachers/:id', adminController.deleteTeacher);
 router.get('/students', adminController.getStudents);
 router.post('/students', adminController.createStudent);
 router.delete('/students/:id', adminController.deleteStudent);
+router.patch('/students/:id/status', adminController.updateStudentStatus);
+router.put('/students/:id/status', adminController.updateStudentStatus);
 
 // Class Assignment Routes
 router.get('/assignment-form-data', adminController.getAssignmentFormData);
@@ -46,10 +48,24 @@ router.get('/courses', adminController.getAllCourses);
 router.put('/courses/:id', adminController.updateCourse);
 router.delete('/courses/:id', adminController.deleteCourse);
 
-// Approval Workflow Routes
+// Approval Workflow Routes (Combined & Specific)
 router.get('/approvals/pending', adminController.getPendingApprovals);
 router.post('/approvals/approve', adminController.approveUser);
 router.post('/approvals/reject', adminController.rejectUser);
+
+// Pending Students Routes
+router.get('/pending-students', adminController.getPendingStudents);
+router.post('/approve-student', adminController.approveStudent);
+router.post('/pending-students/approve', adminController.approveStudent);
+router.post('/reject-student', adminController.rejectStudent);
+router.delete('/reject-student/:student_id', adminController.rejectStudent);
+
+// Pending Faculty Routes
+router.get('/pending-faculty', adminController.getPendingFaculty);
+router.post('/approve-faculty', adminController.approveFaculty);
+router.post('/pending-faculty/approve', adminController.approveFaculty);
+router.post('/reject-faculty', adminController.rejectFaculty);
+router.delete('/reject-faculty/:teacher_id', adminController.rejectFaculty);
 
 // Absence Leave Management Routes
 router.get('/leaves', adminController.getAllLeaveRequests);
@@ -76,10 +92,4 @@ router.delete('/attendance/:id', adminController.deleteAttendanceRecord);
 router.get('/system-settings', adminController.getSystemSettings);
 router.put('/system-settings', adminController.updateSystemSettings);
 
-// Explicit Faculty Approval Routes
-router.get('/pending-faculty', adminController.getPendingFaculty);
-router.post('/approve-faculty', adminController.approveFaculty);
-router.post('/pending-faculty/approve', adminController.approveFaculty);
-router.post('/reject-faculty', adminController.rejectFaculty);
-router.delete('/reject-faculty/:teacher_id', adminController.rejectFaculty);
 module.exports = router;

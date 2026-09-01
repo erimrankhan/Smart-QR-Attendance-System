@@ -235,13 +235,18 @@ exports.getStudents = async (req, res) => {
     try {
         let sql = `
             SELECT s.id, s.enrollment_no, s.roll_no, s.name, s.email, s.phone, s.status, s.profile_pic, s.created_at,
+                   s.course_id, s.semester_id, s.section_id,
+                   s.semester_id AS semester,
                    c.name AS course_name, c.code AS course_code,
                    d.name AS department_name, d.code AS department_code,
-                   sec.name AS section_name
+                   sec.name AS section_name,
+                   sem.semester_number,
+                   COALESCE(sem.semester_number, s.semester_id) AS display_semester
             FROM Students s
             LEFT JOIN Courses c ON s.course_id = c.id
             LEFT JOIN Departments d ON c.department_id = d.id
             LEFT JOIN Sections sec ON s.section_id = sec.id
+            LEFT JOIN Semesters sem ON s.semester_id = sem.id
         `;
         const params = [];
 
@@ -269,7 +274,7 @@ exports.getStudents = async (req, res) => {
  * POST /api/admin/students
  */
 exports.createStudent = async (req, res) => {
-    const { section_id, course_id, enrollment_no, roll_no, name, email, password, phone, status } = req.body;
+    let { section_id, section, course_id, semester_id, semester, department_id, enrollment_no, roll_no, name, email, password, phone, status } = req.body;
 
     if (!enrollment_no || !name || !email || !password) {
         return res.status(400).json({
@@ -278,16 +283,34 @@ exports.createStudent = async (req, res) => {
         });
     }
 
+    let parsedCourseId = (course_id && !isNaN(parseInt(course_id, 10))) ? parseInt(course_id, 10) : null;
+    let parsedSemesterId = (semester_id || semester) && !isNaN(parseInt(semester_id || semester, 10)) ? parseInt(semester_id || semester, 10) : null;
+    let parsedSectionId = section_id || section || null;
+
     try {
+        if (parsedSectionId && isNaN(parseInt(parsedSectionId, 10))) {
+            const secName = parsedSectionId.toString().trim();
+            const [secRows] = await pool.query('SELECT id FROM Sections WHERE name = ? LIMIT 1', [secName]);
+            if (secRows.length > 0) {
+                parsedSectionId = secRows[0].id;
+            } else {
+                const [insertSec] = await pool.query('INSERT INTO Sections (name) VALUES (?)', [secName]);
+                parsedSectionId = insertSec.insertId;
+            }
+        } else if (parsedSectionId) {
+            parsedSectionId = parseInt(parsedSectionId, 10);
+        }
+
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
         const [result] = await pool.query(
-            `INSERT INTO Students (section_id, course_id, enrollment_no, roll_no, name, email, password, phone, status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO Students (section_id, course_id, semester_id, enrollment_no, roll_no, name, email, password, phone, status) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                section_id || null,
-                course_id || null,
+                parsedSectionId || null,
+                parsedCourseId || null,
+                parsedSemesterId || null,
                 enrollment_no.trim(),
                 roll_no ? roll_no.trim() : null,
                 name.trim(),
@@ -307,8 +330,10 @@ exports.createStudent = async (req, res) => {
                 roll_no: roll_no ? roll_no.trim() : null,
                 name: name.trim(),
                 email: email.trim().toLowerCase(),
-                section_id: section_id || null,
-                course_id: course_id || null,
+                phone: phone ? phone.trim() : null,
+                section_id: parsedSectionId || null,
+                course_id: parsedCourseId || null,
+                semester_id: parsedSemesterId || null,
                 status: status || 'Active'
             }
         });
@@ -422,29 +447,49 @@ exports.getSubjectsByDepartment = async (req, res) => {
  * POST /api/admin/assign-class
  */
 exports.assignClass = async (req, res) => {
-    const { teacher_id, subject_id, section_id } = req.body;
+    let { teacher_id, subject_id, section_id, section } = req.body;
 
     if (!teacher_id || !subject_id) {
         return res.status(400).json({
             status: 'fail',
+            success: false,
             message: 'Teacher and Subject selection are required.'
         });
     }
 
+    let finalSectionId = section_id || section || null;
+
     try {
+        // If section is provided as a letter name like 'A', 'B', 'C', 'D', 'E'
+        if (finalSectionId && isNaN(parseInt(finalSectionId, 10))) {
+            const sectionName = finalSectionId.toString().trim();
+            const [secRows] = await pool.query('SELECT id FROM Sections WHERE name = ? LIMIT 1', [sectionName]);
+            if (secRows.length > 0) {
+                finalSectionId = secRows[0].id;
+            } else {
+                const [insertSec] = await pool.query('INSERT INTO Sections (name) VALUES (?)', [sectionName]);
+                finalSectionId = insertSec.insertId;
+            }
+        } else if (finalSectionId) {
+            finalSectionId = parseInt(finalSectionId, 10);
+        }
+
         const [result] = await pool.query(
             'INSERT INTO Classes (teacher_id, subject_id, section_id) VALUES (?, ?, ?)',
-            [teacher_id, subject_id, section_id || null]
+            [teacher_id, subject_id, finalSectionId || null]
         );
 
         res.status(201).json({
             status: 'success',
+            success: true,
             message: 'Class assigned successfully.',
             data: {
                 id: result.insertId,
+                mapping_id: result.insertId,
+                class_id: result.insertId,
                 teacher_id,
                 subject_id,
-                section_id: section_id || null
+                section_id: finalSectionId || null
             }
         });
     } catch (error) {
@@ -452,10 +497,11 @@ exports.assignClass = async (req, res) => {
         if (error.code === 'ER_DUP_ENTRY') {
             return res.status(409).json({
                 status: 'fail',
+                success: false,
                 message: 'This exact class assignment (Teacher, Subject, Section) already exists.'
             });
         }
-        res.status(500).json({ status: 'error', message: 'Internal server error while assigning class.' });
+        res.status(500).json({ status: 'error', success: false, message: 'Internal server error while assigning class.' });
     }
 };
 
@@ -466,7 +512,8 @@ exports.assignClass = async (req, res) => {
 exports.getAllAssignedClasses = async (req, res) => {
     try {
         const [assignedClasses] = await pool.query(`
-            SELECT c.id, c.teacher_id, t.name AS teacher_name, t.employee_id,
+            SELECT c.id, c.id AS mapping_id, c.id AS class_id,
+                   c.teacher_id, t.name AS teacher_name, t.employee_id,
                    c.subject_id, sub.name AS subject_name, sub.code AS subject_code,
                    c.section_id, sec.name AS section_name, c.created_at
             FROM Classes c
@@ -478,11 +525,12 @@ exports.getAllAssignedClasses = async (req, res) => {
 
         res.status(200).json({
             status: 'success',
+            success: true,
             data: assignedClasses
         });
     } catch (error) {
         console.error('Get All Assigned Classes Error:', error);
-        res.status(500).json({ status: 'error', message: 'Internal server error while fetching assigned classes.' });
+        res.status(500).json({ status: 'error', success: false, message: 'Internal server error while fetching assigned classes.' });
     }
 };
 
@@ -613,15 +661,16 @@ exports.getAllSubjects = async (req, res) => {
     try {
         const [subjects] = await pool.query(`
             SELECT s.id, s.name, s.name AS subject_name, s.code, s.type, s.created_at,
-                   s.semester_id, s.course_id, s.department_id,
+                   s.semester_id, s.semester_id AS semester, s.course_id, s.department_id,
                    d.name AS department_name,
                    c.name AS course_name, c.code AS course_code,
-                   sem.semester_number
+                   sem.semester_number,
+                   COALESCE(sem.semester_number, s.semester_id) AS display_semester
             FROM Subjects s
             LEFT JOIN Departments d ON s.department_id = d.id
             LEFT JOIN Courses c ON s.course_id = c.id
             LEFT JOIN Semesters sem ON s.semester_id = sem.id
-            ORDER BY s.created_at DESC
+            ORDER BY s.id DESC
         `);
 
         res.status(200).json({
@@ -989,6 +1038,145 @@ exports.rejectFaculty = async (req, res) => {
     } catch (error) {
         console.error('Reject Faculty Error:', error.message);
         res.status(500).json({ status: 'error', message: 'Internal server error while rejecting faculty.' });
+    }
+};
+
+/**
+ * Fetch All Pending Student Registrations
+ * GET /api/admin/pending-students
+ */
+exports.getPendingStudents = async (req, res) => {
+    try {
+        const [pendingStudents] = await pool.query(`
+            SELECT s.id, s.enrollment_no, s.roll_no, s.name, s.email, s.phone, s.status, s.created_at,
+                   s.course_id, s.semester_id, s.section_id,
+                   c.name AS course_name, c.code AS course_code,
+                   sec.name AS section_name
+            FROM Students s
+            LEFT JOIN Courses c ON s.course_id = c.id
+            LEFT JOIN Sections sec ON s.section_id = sec.id
+            WHERE s.status = 'Pending'
+            ORDER BY s.id DESC
+        `);
+
+        res.status(200).json({
+            status: 'success',
+            success: true,
+            data: pendingStudents
+        });
+    } catch (error) {
+        console.error('Get Pending Students Error:', error.message);
+        res.status(500).json({
+            status: 'error',
+            success: false,
+            message: 'Internal server error while fetching pending student registrations.'
+        });
+    }
+};
+
+/**
+ * Update Student Status (Active / Inactive)
+ * PATCH /api/admin/students/:id/status or PUT /api/admin/students/:id/status
+ */
+exports.updateStudentStatus = async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status || !['Active', 'Inactive', 'Pending'].includes(status)) {
+        return res.status(400).json({
+            status: 'fail',
+            success: false,
+            message: "Invalid status value. Must be 'Active', 'Inactive', or 'Pending'."
+        });
+    }
+
+    try {
+        const [result] = await pool.query(
+            'UPDATE Students SET status = ? WHERE id = ?',
+            [status, id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                status: 'fail',
+                success: false,
+                message: 'Student record not found.'
+            });
+        }
+
+        const actionText = status === 'Active' ? 'approved' : status === 'Inactive' ? 'rejected/deactivated' : 'updated';
+
+        res.status(200).json({
+            status: 'success',
+            success: true,
+            message: `Student account ${actionText} successfully.`,
+            data: { id: parseInt(id, 10), status }
+        });
+    } catch (error) {
+        console.error('Update Student Status Error:', error.message);
+        res.status(500).json({
+            status: 'error',
+            success: false,
+            message: 'Internal server error while updating student status.'
+        });
+    }
+};
+
+/**
+ * Approve Pending Student
+ * POST /api/admin/approve-student or POST /api/admin/pending-students/approve
+ */
+exports.approveStudent = async (req, res) => {
+    const student_id = req.body.student_id || req.body.userId || req.params.id;
+
+    if (!student_id) {
+        return res.status(400).json({ status: 'fail', message: 'Student ID is required for approval.' });
+    }
+
+    try {
+        const [result] = await pool.query("UPDATE Students SET status = 'Active' WHERE id = ?", [student_id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ status: 'fail', message: 'Student record not found.' });
+        }
+
+        res.status(200).json({
+            status: 'success',
+            success: true,
+            message: 'Student account approved successfully.'
+        });
+    } catch (error) {
+        console.error('Approve Student Error:', error.message);
+        res.status(500).json({ status: 'error', message: 'Internal server error while approving student.' });
+    }
+};
+
+/**
+ * Reject Pending Student
+ * DELETE /api/admin/reject-student/:student_id or POST /api/admin/reject-student
+ */
+exports.rejectStudent = async (req, res) => {
+    const student_id = req.params.student_id || req.params.id || req.body.student_id || req.body.userId;
+
+    if (!student_id) {
+        return res.status(400).json({ status: 'fail', message: 'Student ID is required for rejection.' });
+    }
+
+    try {
+        const [result] = await pool.query("UPDATE Students SET status = 'Inactive' WHERE id = ?", [student_id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ status: 'fail', message: 'Student record not found.' });
+        }
+
+        res.status(200).json({
+            status: 'success',
+            success: true,
+            message: 'Student registration rejected.'
+        });
+    } catch (error) {
+        console.error('Reject Student Error:', error.message);
+        res.status(500).json({ status: 'error', message: 'Internal server error while rejecting student.' });
     }
 };
 

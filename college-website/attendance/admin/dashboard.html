@@ -19,11 +19,11 @@
     <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
-    <!-- Mobile Drawer Backdrop Overlay -->
-    <div class="mobile-overlay" id="mobileOverlay"></div>
+    <!-- Dark Translucent Backdrop Overlay -->
+    <div class="portal-backdrop sidebar-backdrop mobile-overlay" id="portalBackdrop"></div>
 
     <div class="app-container">
-        <!-- Sidebar Navigation -->
+        <!-- Slide-In Navigation Drawer (Hidden Off-Screen By Default) -->
         <aside class="sidebar" id="sidebar">
             <div class="brand">
                 <div class="brand-logo">
@@ -33,6 +33,10 @@
                     <h2>Smart QR</h2>
                     <p>Admin Portal</p>
                 </div>
+                <!-- Close Drawer Button -->
+                <button class="portal-sidebar-close sidebar-close-btn mobile-sidebar-close" id="portalSidebarClose" title="Close Navigation Menu" aria-label="Close Navigation Menu">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
 
             <nav class="nav-menu">
@@ -88,8 +92,10 @@
             <!-- Top Header (Topbar) -->
             <header class="top-header">
                 <div style="display: flex; align-items: center;">
-                    <button class="mobile-toggle-btn" id="mobileMenuToggle" title="Toggle Navigation Menu">
-                        <i class="fa-solid fa-bars"></i>
+                    <button class="portal-sidebar-toggle sidebar-toggle-btn hamburger-btn menu-toggle mobile-toggle-btn" id="portalSidebarToggle" aria-label="Toggle Navigation" title="Toggle Navigation Menu">
+                        <span class="bar"></span>
+                        <span class="bar"></span>
+                        <span class="bar"></span>
                     </button>
                     <div class="page-title">
                         <h1 id="view-title">System Overview</h1>
@@ -460,6 +466,43 @@
                                 <label for="student-phone">Phone Number</label>
                                 <input type="text" id="student-phone" class="form-control" placeholder="+1 555-0188">
                             </div>
+                            <div class="form-group">
+                                <label for="student-dept-select">Department</label>
+                                <select id="student-dept-select" class="form-control" name="department_id">
+                                    <option value="">Select Department</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="student-course-select">Course Program</label>
+                                <select id="student-course-select" class="form-control" name="course_id">
+                                    <option value="">Select Course Program</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="student-semester-select">Semester</label>
+                                <select id="student-semester-select" class="form-control" name="semester_id">
+                                    <option value="">Select Semester</option>
+                                    <option value="1">Semester 1</option>
+                                    <option value="2">Semester 2</option>
+                                    <option value="3">Semester 3</option>
+                                    <option value="4">Semester 4</option>
+                                    <option value="5">Semester 5</option>
+                                    <option value="6">Semester 6</option>
+                                    <option value="7">Semester 7</option>
+                                    <option value="8">Semester 8</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="student-section-select">Section</label>
+                                <select id="student-section-select" class="form-control" name="section_id">
+                                    <option value="">Select Section</option>
+                                    <option value="A">Section A</option>
+                                    <option value="B">Section B</option>
+                                    <option value="C">Section C</option>
+                                    <option value="D">Section D</option>
+                                    <option value="E">Section E</option>
+                                </select>
+                            </div>
                         </div>
                         <button type="submit" class="btn btn-primary">
                             <i class="fa-solid fa-user-graduate"></i> Enroll Student Account
@@ -485,13 +528,16 @@
                                     <th>Name</th>
                                     <th>Course</th>
                                     <th>Department</th>
+                                    <th>Semester</th>
+                                    <th>Section</th>
                                     <th>Email</th>
+                                    <th>Phone</th>
                                     <th>Status</th>
                                     <th>Actions & Controls</th>
                                 </tr>
                             </thead>
                             <tbody id="students-tbody">
-                                <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading student registry...</td></tr>
+                                <tr><td colspan="11" style="text-align: center; color: var(--text-muted);">Loading student registry...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -526,8 +572,13 @@
                             </div>
                             <div class="form-group">
                                 <label for="assign-section-select">Section (Optional)</label>
-                                <select id="assign-section-select" class="form-control">
-                                    <option value="">Loading sections...</option>
+                                <select id="assign-section-select" class="form-control" name="section">
+                                    <option value="">Select Section (Optional)</option>
+                                    <option value="A">Section A</option>
+                                    <option value="B">Section B</option>
+                                    <option value="C">Section C</option>
+                                    <option value="D">Section D</option>
+                                    <option value="E">Section E</option>
                                 </select>
                             </div>
                         </div>

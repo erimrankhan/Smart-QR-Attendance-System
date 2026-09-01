@@ -1,11 +1,18 @@
 const path = require('path');
+const fs = require('fs');
 const multer = require('multer');
 const pool = require('../config/db');
+
+// Ensure uploads directory exists
+const uploadDir = path.join(__dirname, '../../uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 // Multer Storage Configuration
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, path.join(__dirname, '../../uploads'));
+        cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -14,14 +21,14 @@ const storage = multer.diskStorage({
     }
 });
 
-// Multer File Filter (.pdf, .doc, .docx only)
+// Multer File Filter (.pdf, .doc, .docx, .ppt, .pptx only)
 const fileFilter = (req, file, cb) => {
-    const allowedTypes = ['.pdf', '.doc', '.docx'];
+    const allowedTypes = ['.pdf', '.doc', '.docx', '.ppt', '.pptx'];
     const ext = path.extname(file.originalname).toLowerCase();
     if (allowedTypes.includes(ext)) {
         cb(null, true);
     } else {
-        cb(new Error('Invalid file format. Only .pdf, .doc, and .docx files are permitted.'), false);
+        cb(new Error('Invalid file format. Only .pdf, .doc, .docx, .ppt, and .pptx files are permitted.'), false);
     }
 };
 
@@ -45,7 +52,7 @@ exports.uploadResource = async (req, res) => {
     }
 
     if (!req.file) {
-        return res.status(400).json({ status: 'fail', message: 'Please upload a PDF or DOC file.' });
+        return res.status(400).json({ status: 'fail', message: 'Please upload a valid document file.' });
     }
 
     try {
@@ -65,6 +72,8 @@ exports.uploadResource = async (req, res) => {
                 id: result.insertId,
                 title: title.trim(),
                 downloadUrl,
+                file_url: relativePath,
+                file_path: relativePath,
                 resource_type: ext,
                 filename: req.file.filename,
                 created_at: new Date()
@@ -86,6 +95,7 @@ exports.getClassResources = async (req, res) => {
     try {
         const [resources] = await pool.query(`
             SELECT r.id, r.title, r.file_path, r.resource_type, r.created_at,
+                   r.created_at AS uploaded_at,
                    t.name AS teacher_name, sub.name AS subject_name, sub.code AS subject_code
             FROM Resources r
             JOIN Teachers t ON r.teacher_id = t.id
@@ -98,7 +108,9 @@ exports.getClassResources = async (req, res) => {
         const host = `${req.protocol}://${req.get('host')}`;
         const formatted = resources.map(r => ({
             ...r,
-            downloadUrl: `${host}${r.file_path}`
+            file_url: r.file_path,
+            downloadUrl: `${host}${r.file_path}`,
+            download_url: `${host}${r.file_path}`
         }));
 
         res.status(200).json({
@@ -112,29 +124,37 @@ exports.getClassResources = async (req, res) => {
 };
 
 /**
- * Fetch All Resources for Student's Enrolled Classes
- * GET /api/resources/my-resources
+ * Fetch All Resources Uploaded by Logged-in Teacher / Faculty
+ * GET /api/resources/teacher-list
  */
-exports.getStudentResources = async (req, res) => {
-    const student_id = req.user.id;
+exports.getTeacherResources = async (req, res) => {
+    const teacher_id = req.user ? req.user.id : null;
+
+    if (!teacher_id) {
+        return res.status(401).json({ status: 'fail', message: 'Unauthorized teacher session.' });
+    }
 
     try {
         const [resources] = await pool.query(`
             SELECT r.id, r.title, r.file_path, r.resource_type, r.created_at,
-                   t.name AS teacher_name, sub.name AS subject_name, sub.code AS subject_code
+                   r.created_at AS uploaded_at,
+                   c.id AS class_id,
+                   sub.name AS subject_name, sub.code AS subject_code,
+                   sec.name AS section_name
             FROM Resources r
-            JOIN Teachers t ON r.teacher_id = t.id
             JOIN Classes c ON r.class_id = c.id
             JOIN Subjects sub ON c.subject_id = sub.id
-            LEFT JOIN Students st ON st.id = ?
-            WHERE c.section_id IS NULL OR c.section_id = st.section_id
+            LEFT JOIN Sections sec ON c.section_id = sec.id
+            WHERE r.teacher_id = ?
             ORDER BY r.id DESC
-        `, [student_id]);
+        `, [teacher_id]);
 
         const host = `${req.protocol}://${req.get('host')}`;
         const formatted = resources.map(r => ({
             ...r,
-            downloadUrl: `${host}${r.file_path}`
+            file_url: r.file_path,
+            downloadUrl: `${host}${r.file_path}`,
+            download_url: `${host}${r.file_path}`
         }));
 
         res.status(200).json({
@@ -142,7 +162,98 @@ exports.getStudentResources = async (req, res) => {
             data: formatted
         });
     } catch (error) {
-        console.error('Get Student Resources Error:', error);
-        res.status(500).json({ status: 'error', message: 'Internal server error while fetching student study materials.' });
+        console.error('Get Teacher Resources Error:', error);
+        res.status(500).json({ status: 'error', message: 'Internal server error while fetching teacher resources.' });
+    }
+};
+
+/**
+ * Fetch All Resources for Student's Enrolled Course and Semester
+ * GET /api/resources/student/materials OR /api/resources/my-resources
+ * Fixed: Strictly uses semester_id, course_id, section_id (no 'current_semester')
+ */
+exports.getStudentMaterials = async (req, res) => {
+    try {
+        const studentId = req.user ? (req.user.id || req.user.student_id) : null;
+        let { course_id, semester_id } = req.query;
+
+        // 1. Fetch student's course_id & semester_id from Students table if logged in and not supplied in query
+        if (studentId && (!course_id || !semester_id)) {
+            const [studentRows] = await pool.query(
+                'SELECT id, course_id, semester_id, section_id FROM Students WHERE id = ?',
+                [studentId]
+            );
+
+            if (studentRows.length > 0) {
+                const student = studentRows[0];
+                course_id = course_id || student.course_id;
+                semester_id = semester_id || student.semester_id;
+
+                // Fallback: If semester_id is not directly set on student, find it via student's section
+                if (!semester_id && student.section_id) {
+                    const [secRows] = await pool.query('SELECT semester_id FROM Sections WHERE id = ?', [student.section_id]);
+                    if (secRows.length > 0 && secRows[0].semester_id) {
+                        semester_id = secRows[0].semester_id;
+                    }
+                }
+
+                // Fallback: If course_id is not directly set on student, find it via semester
+                if (!course_id && semester_id) {
+                    const [semRows] = await pool.query('SELECT course_id FROM Semesters WHERE id = ?', [semester_id]);
+                    if (semRows.length > 0 && semRows[0].course_id) {
+                        course_id = semRows[0].course_id;
+                    }
+                }
+            }
+        }
+
+        // 2. Fetch Resources joined with Classes, Subjects, Teachers, Sections, and Semesters
+        let query = `
+            SELECT r.id, r.title, r.file_path, r.resource_type, r.created_at,
+                   r.created_at AS uploaded_at,
+                   t.name AS faculty_name, t.name AS teacher_name,
+                   sub.name AS subject_name, sub.code AS subject_code,
+                   c.id AS class_id,
+                   sec.name AS section_name
+            FROM Resources r
+            JOIN Teachers t ON r.teacher_id = t.id
+            JOIN Classes c ON r.class_id = c.id
+            JOIN Subjects sub ON c.subject_id = sub.id
+            LEFT JOIN Sections sec ON c.section_id = sec.id
+            LEFT JOIN Semesters sem ON sub.semester_id = sem.id OR sec.semester_id = sem.id
+            WHERE 1=1
+        `;
+
+        const queryParams = [];
+
+        if (course_id) {
+            query += ` AND (sub.course_id = ? OR sem.course_id = ?)`;
+            queryParams.push(course_id, course_id);
+        }
+
+        if (semester_id) {
+            query += ` AND (sub.semester_id = ? OR sec.semester_id = ? OR sem.id = ?)`;
+            queryParams.push(semester_id, semester_id, semester_id);
+        }
+
+        query += ` ORDER BY r.id DESC`;
+
+        const [materials] = await pool.query(query, queryParams);
+
+        const host = `${req.protocol}://${req.get('host')}`;
+        const formatted = materials.map(item => ({
+            ...item,
+            file_url: item.file_path,
+            downloadUrl: `${host}${item.file_path}`,
+            download_url: `${host}${item.file_path}`
+        }));
+
+        res.status(200).json({
+            status: 'success',
+            data: formatted
+        });
+    } catch (error) {
+        console.error('Error fetching student materials:', error);
+        res.status(500).json({ status: 'error', message: error.message });
     }
 };
