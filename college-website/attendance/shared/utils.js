@@ -2,10 +2,19 @@
  * Smart QR Attendance System - Shared Utility Functions (Toasts, Modals, Loading Overlay)
  */
 
-// Auto-detect Host IP / Localhost for Backend API
-window.HOST_IP = (window.location.hostname && window.location.hostname !== '') ? window.location.hostname : 'localhost';
-window.API_BASE_URL = `http://${window.HOST_IP}:5000`;
+// 1. Apna Live Render Backend URL yahan paste karein:
+const PRODUCTION_BACKEND_URL = "https://smart-qr-attendance-system-8qzs.onrender.com/"; 
+
+// 2. Smart Environment Detection (Local vs Production)
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+window.API_BASE_URL = isLocal ? `http://${window.location.hostname}:5000` : PRODUCTION_BACKEND_URL;
 window.SERVER_URL = window.API_BASE_URL;
+
+// Base Endpoints for all Portals
+window.ADMIN_API_BASE_URL = `${window.API_BASE_URL}/api/admin`;
+window.TEACHER_API_BASE_URL = `${window.API_BASE_URL}/api/teacher`;
+window.STUDENT_API_BASE_URL = `${window.API_BASE_URL}/api/student`;
 
 let loaderSafetyTimeout = null;
 

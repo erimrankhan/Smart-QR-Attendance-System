@@ -2,8 +2,13 @@
  * Smart QR Attendance System - Faculty Registration Logic
  */
 
-const HOST_IP = (window.location.hostname && window.location.hostname !== '') ? window.location.hostname : 'localhost';
-const AUTH_API_URL = `http://${HOST_IP}:5000/api/auth`;
+// Production Cloud Backend Fallback Configuration
+const PRODUCTION_BACKEND_URL = "https://smart-qr-attendance-system-8qzs.onrender.com/"; // Apna Render Backend URL yahan replace karein
+
+const isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const BASE_SERVER_URL = window.API_BASE_URL || (isLocalEnv ? `http://${window.location.hostname}:5000` : PRODUCTION_BACKEND_URL);
+
+const AUTH_API_URL = `${BASE_SERVER_URL}/api/auth`;
 
 // Faculty OTP Verification State
 let isFacultyEmailVerified = false;

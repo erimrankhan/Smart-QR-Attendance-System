@@ -1,10 +1,19 @@
-const HOST_IP = (window.location.hostname && window.location.hostname !== '') ? window.location.hostname : 'localhost';
-const SERVER_URL = `http://${HOST_IP}:5000`;
+/**
+ * Smart QR Attendance System - Faculty Material Upload Logic
+ */
+
+// Production Cloud Backend Fallback Configuration
+const PRODUCTION_BACKEND_URL = "https://smart-qr-attendance-system-8qzs.onrender.com/"; // Apna Render Backend URL yahan replace karein
+
+const isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const BASE_SERVER_URL = window.API_BASE_URL || (isLocalEnv ? `http://${window.location.hostname}:5000` : PRODUCTION_BACKEND_URL);
+
+const SERVER_URL = BASE_SERVER_URL;
 const API_BASE_URL = `${SERVER_URL}/api`;
 
 // Utility helper to get JWT Authorization headers
 function getAuthHeaders() {
-    const token = localStorage.getItem('teacherToken') || localStorage.getItem('authToken');
+    const token = localStorage.getItem('teacherToken') || localStorage.getItem('token') || localStorage.getItem('authToken');
     return {
         'Authorization': `Bearer ${token}`
     };

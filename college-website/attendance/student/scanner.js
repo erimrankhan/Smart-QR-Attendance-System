@@ -3,6 +3,12 @@
  * File: college-website/attendance/student/scanner.js
  */
 
+// Production Cloud Backend Fallback Configuration
+const PRODUCTION_BACKEND_URL = "https://smart-qr-attendance-system-8qzs.onrender.com/"; // Apna Render Backend URL yahan replace karein
+
+const isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const BASE_SERVER_URL = window.API_BASE_URL || (isLocalEnv ? `http://${window.location.hostname}:5000` : PRODUCTION_BACKEND_URL);
+
 /**
  * Global scanner processing flag to prevent race conditions during camera scanning
  */
@@ -103,10 +109,9 @@ async function onQrCodeScanned(decodedText, decodedResult) {
  * @param {Object} payload - Validated session data
  */
 async function submitAttendanceToBackend(payload) {
-    const HOST_IP = (window.location.hostname && window.location.hostname !== '') ? window.location.hostname : 'localhost';
-    const baseUrl = (typeof API_BASE_URL !== 'undefined') 
+    const baseUrl = window.STUDENT_API_BASE_URL || (typeof API_BASE_URL !== 'undefined' 
         ? API_BASE_URL 
-        : `http://${HOST_IP}:5000/api/student`;
+        : `${BASE_SERVER_URL}/api/student`);
 
     const authHeaders = (typeof getAuthHeaders === 'function') 
         ? getAuthHeaders() 

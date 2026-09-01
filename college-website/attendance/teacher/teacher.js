@@ -2,9 +2,14 @@
  * Smart QR Attendance System - Faculty Portal Suite Logic (Updated & Fixed)
  */
 
-const HOST_IP = (window.location.hostname && window.location.hostname !== '') ? window.location.hostname : 'localhost';
-const SERVER_URL = `http://${HOST_IP}:5000`;
-const API_BASE_URL = `${SERVER_URL}/api/teacher`;
+// Production Cloud Backend Fallback Configuration
+const PRODUCTION_BACKEND_URL = "https://smart-qr-attendance-system-8qzs.onrender.com/"; // Apna Render Backend URL yahan replace karein
+
+const isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const BASE_SERVER_URL = window.API_BASE_URL || (isLocalEnv ? `http://${window.location.hostname}:5000` : PRODUCTION_BACKEND_URL);
+
+const SERVER_URL = BASE_SERVER_URL;
+const API_BASE_URL = window.TEACHER_API_BASE_URL || `${SERVER_URL}/api/teacher`;
 const RESOURCE_API_URL = `${SERVER_URL}/api/resources`;
 
 let activeSessionId = null;
@@ -537,7 +542,6 @@ async function regenerateActiveQR() {
         const resData = await response.json();
 
         if (response.ok && (resData.status === 'success' || resData.success)) {
-            // Robust PIN extraction from all possible payload levels
             const sessionPin = resData.session_pin 
                             || resData.pin 
                             || resData.sessionPin 
@@ -631,7 +635,6 @@ function startLivePolling(sessionId) {
 async function fetchLiveScans(sessionId) {
     if (!sessionId) return;
     try {
-        // Added timestamp (?t=...) to completely bypass 304 Not Modified cache
         const response = await fetch(`${API_BASE_URL}/live-attendance/${sessionId}?t=${Date.now()}`, { 
             headers: getAuthHeaders(),
             cache: 'no-store'
@@ -639,7 +642,6 @@ async function fetchLiveScans(sessionId) {
         const resData = await response.json();
 
         if (response.ok && resData.status === 'success' && resData.data) {
-            // Update PIN if available in live session data
             const livePin = resData.data.sessionPin || resData.data.session_pin;
             if (livePin) {
                 updateSessionPinDisplay(livePin);
