@@ -2,12 +2,13 @@
  * Smart QR Attendance System - Analytics & Export Reports Engine (Chart.js + Blob Download)
  */
 
-// Production Cloud Backend Fallback Configuration
-const PRODUCTION_BACKEND_URL = "https://smart-qr-attendance-system-8qzs.onrender.com"; // Apna Render Backend URL yahan replace karein
+// Production Cloud Backend Fallback Configuration (Window-scoped to prevent duplicate declaration errors)
+window.BACKEND_API_URL = window.API_BASE_URL || 
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+        ? `http://${window.location.hostname}:5000` 
+        : "https://smart-qr-attendance-system-8qzs.onrender.com");
 
-const isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const BASE_SERVER_URL = window.API_BASE_URL || (isLocalEnv ? `http://${window.location.hostname}:5000` : PRODUCTION_BACKEND_URL);
-
+const BASE_SERVER_URL = window.BACKEND_API_URL;
 const REPORTS_API = `${BASE_SERVER_URL}/api/reports`;
 
 let dailyTrendChartInstance = null;

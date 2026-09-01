@@ -620,12 +620,13 @@
     <script src="../shared/utils.js"></script>
 
     <script>
-        // Production Cloud Backend Configuration
-        const PRODUCTION_BACKEND_URL = "https://smart-qr-attendance-system-8qzs.onrender.com"; // Apna actual Render backend URL yahan paste karein
+        // Production Cloud Backend Configuration (Safe Resolution)
+        window.BACKEND_API_URL = window.API_BASE_URL || 
+            (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                ? `http://${window.location.hostname}:5000` 
+                : "https://smart-qr-attendance-system-8qzs.onrender.com");
 
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const BASE_SERVER_URL = window.API_BASE_URL || (isLocal ? `http://${window.location.hostname}:5000` : PRODUCTION_BACKEND_URL);
-        const SERVER_URL = BASE_SERVER_URL;
+        const SERVER_URL = window.BACKEND_API_URL;
         const API_BASE_URL = `${SERVER_URL}/api`;
 
         // Password Show/Hide Toggle
@@ -642,14 +643,12 @@
 
         let loadedCoursesCache = [];
 
-        // Helper: Convert number to ordinal string (1 -> 1st, 2 -> 2nd, etc.)
         function getOrdinal(n) {
             const s = ["th", "st", "nd", "rd"];
             const v = n % 100;
             return n + (s[(v - 20) % 10] || s[v] || s[0]);
         }
 
-        // Helper: Determine total semesters for a program
         function determineMaxSemesters(course) {
             if (!course) return 8;
 

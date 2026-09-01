@@ -3,12 +3,13 @@
  * Modules 1-5: Dashboard, QR Scanner, Attendance Analytics, Profile, Leaves/Alerts, and Reports
  */
 
-// Production Cloud Backend Fallback Configuration
-const PRODUCTION_BACKEND_URL = "https://smart-qr-attendance-system-8qzs.onrender.com"; // Apna Render Backend URL yahan replace karein
+// Production Cloud Backend Fallback Configuration (Safe Global Resolution)
+window.BACKEND_API_URL = window.API_BASE_URL || 
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+        ? `http://${window.location.hostname}:5000` 
+        : "https://smart-qr-attendance-system-8qzs.onrender.com");
 
-const isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const BASE_SERVER_URL = window.API_BASE_URL || (isLocalEnv ? `http://${window.location.hostname}:5000` : PRODUCTION_BACKEND_URL);
-
+const BASE_SERVER_URL = window.BACKEND_API_URL;
 const SERVER_URL = BASE_SERVER_URL;
 const API_BASE_URL = window.STUDENT_API_BASE_URL || `${SERVER_URL}/api/student`;
 
@@ -283,7 +284,6 @@ function initSidebarDrawer() {
     window.closeSidebar = closeSidebar;
     window.closeMobileSidebar = closeSidebar;
 
-    // Handle all hamburger and close button variations via robust event delegation
     document.addEventListener('click', (e) => {
         const btn = e.target.closest('#sidebarToggleBtn, #hamburgerBtn, #mobileMenuToggle, .menu-toggle, .hamburger-btn, .sidebar-toggle-btn');
         if (btn) {
@@ -302,13 +302,11 @@ function initSidebarDrawer() {
         }
     });
 
-    // Close when tapping backdrop
     backdrop.addEventListener('click', (e) => {
         e.preventDefault();
         closeSidebar();
     });
 
-    // Keyboard ESC key support to close drawer
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' || e.key === 'Esc') {
             closeSidebar();
@@ -394,7 +392,6 @@ function switchView(viewId) {
     if (targetSection) targetSection.classList.add('active');
     if (targetNav) targetNav.classList.add('active');
 
-    // Title Updates
     const titleEl = document.getElementById('view-title');
     const subtitleEl = document.getElementById('view-subtitle');
 
@@ -477,7 +474,6 @@ async function loadStudyMaterials() {
         });
 
         const resData = await response.json();
-        console.log("Materials fetched:", resData);
 
         if (response.ok && resData.status === 'success') {
             const materials = Array.isArray(resData.data) ? resData.data : (resData.resources || []);
@@ -543,7 +539,6 @@ async function loadStudyMaterials() {
     }
 }
 
-// Backward compatibility alias & initialization
 const fetchStudentMaterials = loadStudyMaterials;
 document.addEventListener('DOMContentLoaded', () => {
     const materialsNav = document.querySelector('.nav-item[data-view="materials-view"]');
@@ -571,7 +566,6 @@ async function loadDashboardData() {
         if (response.ok && resData.status === 'success') {
             const { student, todayStatus, stats, recentHistory } = resData.data || {};
 
-            // Update Top Bar & Header Profile
             if (student) {
                 const nameEl = document.getElementById('student-name-display');
                 const enrollEl = document.getElementById('student-enrollment-display');
@@ -579,7 +573,6 @@ async function loadDashboardData() {
                 if (enrollEl) enrollEl.textContent = `Enrollment: ${student.enrollment_no}`;
             }
 
-            // Update Today's Status Banner
             const titleBanner = document.getElementById('today-status-title');
             const subBanner = document.getElementById('today-status-subtitle');
             if (titleBanner && subBanner && todayStatus) {
@@ -594,7 +587,6 @@ async function loadDashboardData() {
                 }
             }
 
-            // Update Stats Counters
             const percEl = document.getElementById('stat-percentage');
             const totalEl = document.getElementById('stat-total-classes');
             const attEl = document.getElementById('stat-attended-classes');
@@ -605,7 +597,6 @@ async function loadDashboardData() {
                 if (attEl) attEl.textContent = stats.attendedClasses || 0;
             }
 
-            // Update Recent Activity Table
             const recentTbody = document.getElementById('recent-attendance-tbody');
             if (recentTbody) {
                 if (!recentHistory || recentHistory.length === 0) {
@@ -698,7 +689,6 @@ async function handlePinAttendanceSubmit(e) {
             }
             if (pinInput) pinInput.value = '';
 
-            // Refresh dashboard data & switch to dashboard view
             setTimeout(() => {
                 loadDashboardData();
                 switchView('dashboard-view');
@@ -966,7 +956,6 @@ async function loadProfile() {
             if (secHeaderEl) secHeaderEl.textContent = p.section_name ? `Section ${p.section_name}` : 'Unassigned';
             if (phoneEl) phoneEl.textContent = p.phone || 'Not Provided';
 
-            // Sync Sidebar Profile Header Card
             const sidebarNameEl = document.getElementById('sidebar-student-name');
             const sidebarEnrollEl = document.getElementById('sidebar-student-enrollment');
             const sidebarSemEl = document.getElementById('sidebar-student-semester');
@@ -982,7 +971,6 @@ async function loadProfile() {
                 imgPreview.src = p.profile_pic ? `${SERVER_URL}${p.profile_pic}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=10b981&color=fff`;
             }
 
-            // Sync Topbar Avatar & LocalStorage
             updateTopbarAvatar(p.profile_pic, p.name);
             const userStr = localStorage.getItem('studentUser') || localStorage.getItem('user');
             if (userStr) {
@@ -1106,7 +1094,6 @@ async function loadStudentNotifications() {
                 }
             }
 
-            // Render Full Card for Tab & Modal
             const renderNotificationItem = (n) => {
                 const priority = (n.priority || n.type || 'info').toLowerCase();
                 let borderAccent = '#6366f1';
@@ -1159,7 +1146,6 @@ async function loadStudentNotifications() {
                 `;
             };
 
-            // Render Compact Card for Bell Dropdown Popup
             const renderDropdownItem = (n) => {
                 const priority = (n.priority || n.type || 'info').toLowerCase();
                 let iconClass = 'fa-info-circle';
@@ -1208,7 +1194,6 @@ async function loadStudentNotifications() {
                 `;
             };
 
-            // 1. Dropdown Popup List
             if (dropdownList) {
                 if (notifications.length === 0) {
                     dropdownList.innerHTML = `
@@ -1222,7 +1207,6 @@ async function loadStudentNotifications() {
                 }
             }
 
-            // 2. Main Tab List
             if (listContainer) {
                 if (notifications.length === 0) {
                     listContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 24px;">No new notifications or system alerts.</div>`;
@@ -1231,7 +1215,6 @@ async function loadStudentNotifications() {
                 }
             }
 
-            // 3. Modal Body
             if (modalBody) {
                 if (notifications.length === 0) {
                     modalBody.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 24px;">No new notifications or system alerts.</div>`;
@@ -1245,14 +1228,10 @@ async function loadStudentNotifications() {
     }
 }
 
-// Backward compatibility alias
 const loadNotifications = loadStudentNotifications;
 window.loadStudentNotifications = loadStudentNotifications;
 window.loadNotifications = loadStudentNotifications;
 
-/**
- * Toggle Bell Notification Dropdown Popup
- */
 function toggleNotificationDropdown(e) {
     if (e) {
         e.stopPropagation();
@@ -1272,9 +1251,6 @@ function toggleNotificationDropdown(e) {
 window.toggleNotificationDropdown = toggleNotificationDropdown;
 window.toggleSystemNotificationModal = toggleNotificationDropdown;
 
-/**
- * Navigate to Leaves & Alerts View from Dropdown
- */
 function navigateToLeavesAndAlerts() {
     const dropdown = document.getElementById('notificationDropdown');
     if (dropdown) dropdown.style.display = 'none';
@@ -1288,7 +1264,6 @@ function navigateToLeavesAndAlerts() {
 }
 window.navigateToLeavesAndAlerts = navigateToLeavesAndAlerts;
 
-// Close dropdown on outside click
 document.addEventListener('click', (e) => {
     const dropdown = document.getElementById('notificationDropdown');
     const bellBtn = document.getElementById('notification-bell');
@@ -1299,9 +1274,6 @@ document.addEventListener('click', (e) => {
     }
 });
 
-/**
- * Mark All Notifications as Read
- */
 async function markAllNotificationsRead(e) {
     if (e) {
         e.stopPropagation();
@@ -1341,7 +1313,6 @@ async function loadReportData() {
         if (response.ok && resData.status === 'success') {
             currentReportData = resData.data;
 
-            // Populate Subject Filter Options if empty
             if (selectFilter && selectFilter.options.length <= 1) {
                 const uniqueSubjects = [];
                 const seen = new Set();
@@ -1391,9 +1362,6 @@ function renderReportTable() {
     }
 }
 
-/**
- * Generate & Download Attendance PDF
- */
 function exportAttendancePDF() {
     if (!window.jspdf || !currentReportData || currentReportData.length === 0) {
         showToast('No report data available to export.', 'error');
@@ -1403,7 +1371,6 @@ function exportAttendancePDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    // Document Header
     doc.setFontSize(18);
     doc.setTextColor(15, 23, 42);
     doc.text('Smart QR Attendance System - Student Report', 14, 20);
@@ -1432,9 +1399,6 @@ function exportAttendancePDF() {
     showToast('PDF Report generated and downloaded successfully!');
 }
 
-/**
- * Print Friendly Report
- */
 function printAttendanceReport() {
     window.print();
 }
@@ -1445,7 +1409,6 @@ function printAttendanceReport() {
  * --------------------------------------------------------------------------
  */
 function initFormListeners() {
-    // Live Leave Duration Calculation
     const startDateInput = document.getElementById('leave-start-date');
     const endDateInput = document.getElementById('leave-end-date');
     const durationBadge = document.getElementById('leave-duration-badge');
@@ -1468,7 +1431,6 @@ function initFormListeners() {
     if (startDateInput) startDateInput.addEventListener('change', updateDurationPill);
     if (endDateInput) endDateInput.addEventListener('change', updateDurationPill);
 
-    // Leave Request Submission
     const leaveForm = document.getElementById('apply-leave-form');
     if (leaveForm) {
         leaveForm.addEventListener('submit', async (e) => {
@@ -1507,7 +1469,6 @@ function initFormListeners() {
         });
     }
 
-    // Live Profile Image Preview on File Selection
     const fileInput = document.getElementById('profile-pic-input');
     const imgPreview = document.getElementById('profile-img-preview');
 
@@ -1523,7 +1484,6 @@ function initFormListeners() {
         });
     }
 
-    // Password Show/Hide Eye Toggles
     const toggleCurrPass = document.getElementById('toggleCurrPass');
     const currPassInput = document.getElementById('curr-pass');
     if (toggleCurrPass && currPassInput) {
@@ -1544,7 +1504,6 @@ function initFormListeners() {
         });
     }
 
-    // Profile Pic Form
     const picForm = document.getElementById('profile-pic-form');
     if (picForm) {
         picForm.addEventListener('submit', async (e) => {
@@ -1575,7 +1534,6 @@ function initFormListeners() {
                     showToast('Profile picture updated successfully!');
                     const newPhotoUrl = resData.data ? resData.data.profile_pic : null;
 
-                    // Immediately sync localStorage & Topbar Avatar
                     const userStr = localStorage.getItem('studentUser') || localStorage.getItem('user');
                     let userName = 'Student';
                     if (userStr) {
@@ -1607,7 +1565,6 @@ function initFormListeners() {
         });
     }
 
-    // Password Change Form
     const passForm = document.getElementById('change-password-form');
     if (passForm) {
         passForm.addEventListener('submit', async (e) => {

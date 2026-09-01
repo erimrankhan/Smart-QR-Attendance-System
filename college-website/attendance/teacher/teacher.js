@@ -2,12 +2,13 @@
  * Smart QR Attendance System - Faculty Portal Suite Logic (Updated & Fixed)
  */
 
-// Production Cloud Backend Fallback Configuration
-const PRODUCTION_BACKEND_URL = "https://smart-qr-attendance-system-8qzs.onrender.com"; // Apna Render Backend URL yahan replace karein
+// Production Cloud Backend Fallback Configuration (Window-scoped to prevent duplicate declaration errors)
+window.BACKEND_API_URL = window.API_BASE_URL || 
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+        ? `http://${window.location.hostname}:5000` 
+        : "https://smart-qr-attendance-system-8qzs.onrender.com");
 
-const isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const BASE_SERVER_URL = window.API_BASE_URL || (isLocalEnv ? `http://${window.location.hostname}:5000` : PRODUCTION_BACKEND_URL);
-
+const BASE_SERVER_URL = window.BACKEND_API_URL;
 const SERVER_URL = BASE_SERVER_URL;
 const API_BASE_URL = window.TEACHER_API_BASE_URL || `${SERVER_URL}/api/teacher`;
 const RESOURCE_API_URL = `${SERVER_URL}/api/resources`;
@@ -343,22 +344,18 @@ async function loadDashboardSummary() {
             if (classesEl) classesEl.textContent = displayClasses.length;
             if (studentsEl) studentsEl.textContent = totalStudents || 0;
 
-            // Handle Active Session state
             if (statusEl) {
                 if (activeSession) {
                     statusEl.textContent = 'ACTIVE (Live)';
                     statusEl.style.color = '#10b981';
 
-                    // 1. Ensure activeSessionId is set properly
                     activeSessionId = activeSession.id || activeSession.session_id;
 
-                    // 2. Extract PIN safely
                     const pin = activeSession.session_pin || activeSession.sessionPin || activeSession.pin;
                     if (pin) {
                         updateSessionPinDisplay(pin);
                     }
 
-                    // 3. Set dropdown and start polling if active
                     const classSelect = document.getElementById('class-select');
                     if (classSelect && activeSession.class_id) {
                         classSelect.value = activeSession.class_id;
@@ -486,7 +483,6 @@ async function startAttendanceSession() {
             
             activeSessionId = sessionId;
 
-            // Update Classroom PIN Display
             updateSessionPinDisplay(sessionPin);
 
             const selectedClass = (Array.isArray(currentAssignedClasses))
@@ -551,10 +547,8 @@ async function regenerateActiveQR() {
                         || resData.qr_token 
                         || (resData.data && (resData.data.qrHash || resData.data.qr_token));
 
-            // 1. Instantly Update Classroom PIN Display Box
             updateSessionPinDisplay(sessionPin);
 
-            // 2. Generate QR
             const selectedClassId = document.getElementById('class-select')?.value;
             const selectedClass = (Array.isArray(currentAssignedClasses))
                 ? (currentAssignedClasses.find(c => c.class_id == selectedClassId || c.id == selectedClassId) || {})
@@ -657,7 +651,6 @@ async function fetchLiveScans(sessionId) {
             if (pCountEl) pCountEl.textContent = totalScanned;
             if (aCountEl) aCountEl.textContent = totalAbsent;
 
-            // Render Present Table
             const pTbody = document.getElementById('live-present-tbody');
             if (pTbody) {
                 if (presentStudents.length === 0) {
@@ -679,7 +672,6 @@ async function fetchLiveScans(sessionId) {
                 }
             }
 
-            // Render Absent Table
             const aTbody = document.getElementById('live-absent-tbody');
             if (aTbody) {
                 if (absentStudents.length === 0) {

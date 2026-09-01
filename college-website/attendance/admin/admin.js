@@ -2,12 +2,13 @@
  * Smart QR Attendance System - Admin Portal Logic (Full Suite)
  */
 
-// Production Cloud Backend Fallback Configuration
-const PRODUCTION_BACKEND_URL = "https://smart-qr-attendance-system-8qzs.onrender.com"; // Apna Render Backend URL yahan replace karein
+// Production Cloud Backend Fallback Configuration (Window-scoped to avoid SyntaxError duplicate declarations)
+window.BACKEND_API_URL = window.API_BASE_URL || 
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+        ? `http://${window.location.hostname}:5000` 
+        : "https://smart-qr-attendance-system-8qzs.onrender.com");
 
-const isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const BASE_SERVER_URL = window.API_BASE_URL || (isLocalEnv ? `http://${window.location.hostname}:5000` : PRODUCTION_BACKEND_URL);
-
+const BASE_SERVER_URL = window.BACKEND_API_URL;
 window.ADMIN_API_BASE_URL = window.ADMIN_API_BASE_URL || `${BASE_SERVER_URL}/api/admin`;
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -55,7 +56,9 @@ function checkAdminAuth() {
     try {
         const user = JSON.parse(userStr);
         if (user.role !== 'Admin') {
-            showToast('Unauthorized access. Redirecting to Admin Login.', 'error');
+            if (typeof showToast === 'function') {
+                showToast('Unauthorized access. Redirecting to Admin Login.', 'error');
+            }
             redirectToLogin();
             return;
         }
@@ -186,7 +189,6 @@ function initPortalDrawer() {
     window.closeSidebar = closeSidebar;
     window.closeMobileMenu = closeSidebar;
 
-    // Handle all hamburger and close button variations via robust event delegation
     document.addEventListener('click', (e) => {
         const btn = e.target.closest('#portalSidebarToggle, #sidebarToggleBtn, #hamburgerBtn, #mobileMenuToggle, .portal-sidebar-toggle, .menu-toggle, .hamburger-btn, .sidebar-toggle-btn');
         if (btn) {
@@ -205,13 +207,11 @@ function initPortalDrawer() {
         }
     });
 
-    // Close when tapping backdrop
     backdrop.addEventListener('click', (e) => {
         e.preventDefault();
         closeSidebar();
     });
 
-    // Keyboard ESC key support to close drawer
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' || e.key === 'Esc') {
             closeSidebar();
