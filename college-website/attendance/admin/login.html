@@ -195,12 +195,13 @@
     <!-- Global Utilities -->
     <script src="../shared/utils.js"></script>
     <script>
-        // Production Cloud Backend Configuration
-        const PRODUCTION_BACKEND_URL = "https://smart-qr-attendance-system-8qzs.onrender.com/"; // Apna actual Render backend URL yahan paste karein
+        // Use window fallback to avoid re-declaration error
+        window.BACKEND_API_URL = window.API_BASE_URL || 
+            (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                ? `http://${window.location.hostname}:5000` 
+                : "https://smart-qr-attendance-system-8qzs.onrender.com");
 
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const BASE_SERVER_URL = window.API_BASE_URL || (isLocal ? `http://${window.location.hostname}:5000` : PRODUCTION_BACKEND_URL);
-        const AUTH_API = `${BASE_SERVER_URL}/api/auth`;
+        const AUTH_API = `${window.BACKEND_API_URL}/api/auth`;
 
         function toggleAdminPasswordVisibility() {
             const passInput = document.getElementById('password');
@@ -220,10 +221,14 @@
 
         document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+            e.stopPropagation();
+
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
 
-            showLoading('Authenticating Admin credentials...');
+            if (typeof showLoading === 'function') {
+                showLoading('Authenticating Admin credentials...');
+            }
 
             try {
                 const response = await fetch(`${AUTH_API}/admin/login`, {
@@ -233,22 +238,34 @@
                 });
 
                 const data = await response.json();
-                hideLoading();
+                if (typeof hideLoading === 'function') hideLoading();
 
                 if (response.ok && data.status === 'success') {
                     localStorage.setItem('adminToken', data.token);
                     localStorage.setItem('adminUser', JSON.stringify(data.user));
 
-                    showToast('Authentication successful! Redirecting to Admin Dashboard...');
+                    if (typeof showToast === 'function') {
+                        showToast('Authentication successful! Redirecting to Admin Dashboard...');
+                    }
+
                     setTimeout(() => {
                         window.location.href = 'dashboard.html';
-                    }, 1000);
+                    }, 600);
                 } else {
-                    showToast(data.message || 'Invalid credentials.', 'error');
+                    if (typeof showToast === 'function') {
+                        showToast(data.message || 'Invalid credentials.', 'error');
+                    } else {
+                        alert(data.message || 'Invalid credentials.');
+                    }
                 }
             } catch (err) {
-                hideLoading();
-                showToast('Unable to connect to backend server. Please verify your connection.', 'error');
+                console.error('Login error:', err);
+                if (typeof hideLoading === 'function') hideLoading();
+                if (typeof showToast === 'function') {
+                    showToast('Unable to connect to backend server. Please verify your connection.', 'error');
+                } else {
+                    alert('Unable to connect to backend server.');
+                }
             }
         });
     </script>
