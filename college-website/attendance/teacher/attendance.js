@@ -3,14 +3,13 @@
  * File: college-website/attendance/teacher/attendance.js
  */
 
-// Production Cloud Backend Fallback Configuration (Window-scoped)
+// Localhost Backend Configuration
 window.BACKEND_API_URL = window.API_BASE_URL || 
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-        ? `http://${window.location.hostname}:5000` 
-        : "https://smart-qr-attendance-system-8qzs.onrender.com");
+    (window.location.protocol.startsWith('http') 
+        ? window.location.origin 
+        : "http://localhost:5000");
 
 const BASE_SERVER_URL = window.BACKEND_API_URL;
-
 /**
  * 2. Faculty Frontend: QR Generation Timing
  * Initiates an attendance session with the backend API and ONLY generates the QR code

@@ -12,8 +12,11 @@ const pool = mysql.createPool({
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    // Aiven Cloud MySQL requires SSL connection
-    ssl: process.env.DB_HOST && process.env.DB_HOST !== 'localhost' ? {
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0,
+    // SSL connection for TiDB Cloud (TLS 1.2+)
+    ssl: (process.env.DB_SSL === 'true' || (process.env.DB_HOST && !['localhost', '127.0.0.1'].includes(process.env.DB_HOST))) ? {
+        minVersion: 'TLSv1.2',
         rejectUnauthorized: false
     } : false
 });

@@ -274,7 +274,7 @@ exports.getStudents = async (req, res) => {
  * POST /api/admin/students
  */
 exports.createStudent = async (req, res) => {
-    let { section_id, section, course_id, semester_id, semester, department_id, enrollment_no, roll_no, name, email, password, phone, status } = req.body;
+    let { section_id, section, course_id, semester_id, semester, enrollment_no, roll_no, name, email, password, phone, status } = req.body;
 
     if (!enrollment_no || !name || !email || !password) {
         return res.status(400).json({
@@ -284,21 +284,65 @@ exports.createStudent = async (req, res) => {
     }
 
     let parsedCourseId = (course_id && !isNaN(parseInt(course_id, 10))) ? parseInt(course_id, 10) : null;
-    let parsedSemesterId = (semester_id || semester) && !isNaN(parseInt(semester_id || semester, 10)) ? parseInt(semester_id || semester, 10) : null;
+    let inputSemester = semester_id || semester;
+    let parsedSemesterNum = (inputSemester && !isNaN(parseInt(inputSemester, 10))) ? parseInt(inputSemester, 10) : null;
+    let parsedSemesterId = null;
     let parsedSectionId = section_id || section || null;
 
     try {
-        if (parsedSectionId && isNaN(parseInt(parsedSectionId, 10))) {
-            const secName = parsedSectionId.toString().trim();
-            const [secRows] = await pool.query('SELECT id FROM Sections WHERE name = ? LIMIT 1', [secName]);
-            if (secRows.length > 0) {
-                parsedSectionId = secRows[0].id;
-            } else {
-                const [insertSec] = await pool.query('INSERT INTO Sections (name) VALUES (?)', [secName]);
-                parsedSectionId = insertSec.insertId;
+        // 1. Verify Course Exists (Foreign Key Safe Guard)
+        if (parsedCourseId) {
+            const [courseRows] = await pool.query('SELECT id FROM Courses WHERE id = ? LIMIT 1', [parsedCourseId]);
+            if (courseRows.length === 0) {
+                parsedCourseId = null; // Prevent FK crash if course doesn't exist
             }
-        } else if (parsedSectionId) {
-            parsedSectionId = parseInt(parsedSectionId, 10);
+        }
+
+        // 2. Resolve or Auto-Insert Semester (Foreign Key Safe Guard)
+        if (parsedSemesterNum) {
+            // Check if semester exists directly by ID or by semester_number + course_id
+            let semQuery = 'SELECT id FROM Semesters WHERE id = ?';
+            let semParams = [parsedSemesterNum];
+
+            if (parsedCourseId) {
+                semQuery += ' OR (semester_number = ? AND (course_id = ? OR course_id IS NULL))';
+                semParams.push(parsedSemesterNum, parsedCourseId);
+            }
+
+            const [semRows] = await pool.query(`${semQuery} LIMIT 1`, semParams);
+
+            if (semRows.length > 0) {
+                parsedSemesterId = semRows[0].id;
+            } else {
+                // Auto-create missing semester row so FK constraint never fails
+                try {
+                    const [insertSem] = await pool.query(
+                        'INSERT INTO Semesters (course_id, semester_number) VALUES (?, ?)', 
+                        [parsedCourseId, parsedSemesterNum]
+                    );
+                    parsedSemesterId = insertSem.insertId;
+                } catch (e) {
+                    // Fallback to null if schema columns differ
+                    parsedSemesterId = null;
+                }
+            }
+        }
+
+        // 3. Resolve or Auto-Insert Section (Foreign Key Safe Guard)
+        if (parsedSectionId) {
+            if (isNaN(parseInt(parsedSectionId, 10))) {
+                const secName = parsedSectionId.toString().trim();
+                const [secRows] = await pool.query('SELECT id FROM Sections WHERE name = ? LIMIT 1', [secName]);
+                if (secRows.length > 0) {
+                    parsedSectionId = secRows[0].id;
+                } else {
+                    const [insertSec] = await pool.query('INSERT INTO Sections (name) VALUES (?)', [secName]);
+                    parsedSectionId = insertSec.insertId;
+                }
+            } else {
+                const [secCheck] = await pool.query('SELECT id FROM Sections WHERE id = ? LIMIT 1', [parseInt(parsedSectionId, 10)]);
+                parsedSectionId = secCheck.length > 0 ? secCheck[0].id : null;
+            }
         }
 
         const saltRounds = 10;
@@ -308,9 +352,9 @@ exports.createStudent = async (req, res) => {
             `INSERT INTO Students (section_id, course_id, semester_id, enrollment_no, roll_no, name, email, password, phone, status) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                parsedSectionId || null,
-                parsedCourseId || null,
-                parsedSemesterId || null,
+                parsedSectionId,
+                parsedCourseId,
+                parsedSemesterId,
                 enrollment_no.trim(),
                 roll_no ? roll_no.trim() : null,
                 name.trim(),
@@ -331,9 +375,9 @@ exports.createStudent = async (req, res) => {
                 name: name.trim(),
                 email: email.trim().toLowerCase(),
                 phone: phone ? phone.trim() : null,
-                section_id: parsedSectionId || null,
-                course_id: parsedCourseId || null,
-                semester_id: parsedSemesterId || null,
+                section_id: parsedSectionId,
+                course_id: parsedCourseId,
+                semester_id: parsedSemesterId,
                 status: status || 'Active'
             }
         });

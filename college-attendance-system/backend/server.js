@@ -19,7 +19,9 @@ const resourceRoutes = require('./src/routes/resourceRoutes');
 const app = express();
 
 // Cross-Origin Resource Policy disable taaki uploaded images/PDFs Netlify par easily access ho sakein
+// Disable CSP & CORP so CDN scripts (QR scanner, Chart.js) and inline onclick handlers work
 app.use(helmet({
+    contentSecurityPolicy: false,
     crossOriginResourcePolicy: false
 })); 
 
@@ -35,8 +37,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev')); 
 
-// Health Check Endpoint
-app.get('/', (req, res) => {
+// Serve static frontend files (college-website) for local host access
+const frontendPath = path.resolve(__dirname, '../../college-website');
+app.use('/college-website', express.static(frontendPath));
+app.use(express.static(frontendPath));
+
+// API Health Check Endpoint
+app.get('/api', (req, res) => {
+    res.status(200).json({ status: 'success', message: 'Smart QR Attendance Backend API Running' });
+});
+app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'success', message: 'Smart QR Attendance Backend API Running' });
 });
 

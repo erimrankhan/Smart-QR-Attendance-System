@@ -3,11 +3,12 @@
  */
 
 (function () {
-    // Production Cloud Backend Fallback Configuration (Window-scoped to prevent duplicate declaration errors)
+    // Localhost Backend Configuration
+   // Auto-detect Localhost vs Live Render URL
     window.BACKEND_API_URL = window.API_BASE_URL || 
-        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-            ? `http://${window.location.hostname}:5000` 
-            : "https://smart-qr-attendance-system-8qzs.onrender.com");
+        (window.location.protocol.startsWith('http') 
+            ? window.location.origin 
+            : "http://localhost:5000");
 
     const BASE_SERVER_URL = window.BACKEND_API_URL;
     const NOTIFICATION_API = `${BASE_SERVER_URL}/api/notifications`;
