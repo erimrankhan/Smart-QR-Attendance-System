@@ -7,7 +7,7 @@ const pool = require('../config/db');
 const otpStore = new Map();
 
 /**
- * Configure Nodemailer Transporter
+- Configure Nodemailer Transporter
  */
 const getEmailTransporter = () => {
     const user = process.env.EMAIL_USER;
@@ -27,7 +27,7 @@ const getEmailTransporter = () => {
 };
 
 /**
- * Helper: Generate Signed JWT Token
+- Helper: Generate Signed JWT Token
  */
 const generateToken = (id, role, email) => {
     return jwt.sign(
@@ -38,8 +38,8 @@ const generateToken = (id, role, email) => {
 };
 
 /**
- * Public Helper: Fetch Courses for Registration Dropdown
- * GET /api/auth/public-courses
+- Public Helper: Fetch Courses for Registration Dropdown
+- GET /api/auth/public-courses
  */
 exports.getPublicCourses = async (req, res) => {
     try {
@@ -55,8 +55,8 @@ exports.getPublicCourses = async (req, res) => {
 };
 
 /**
- * Public Helper: Fetch Departments for Registration Dropdown
- * GET /api/auth/public-departments
+- Public Helper: Fetch Departments for Registration Dropdown
+- GET /api/auth/public-departments
  */
 exports.getPublicDepartments = async (req, res) => {
     try {
@@ -72,8 +72,8 @@ exports.getPublicDepartments = async (req, res) => {
 };
 
 /**
- * Public Helper: Fetch Sections for Registration Dropdown
- * GET /api/auth/public-sections
+- Public Helper: Fetch Sections for Registration Dropdown
+- GET /api/auth/public-sections
  */
 exports.getPublicSections = async (req, res) => {
     try {
@@ -97,8 +97,8 @@ exports.getPublicSections = async (req, res) => {
 };
 
 /**
- * Admin Login Handler
- * POST /api/auth/admin/login
+- Admin Login Handler
+- POST /api/auth/admin/login
  */
 exports.adminLogin = async (req, res) => {
     const { username, password } = req.body;
@@ -145,8 +145,8 @@ exports.adminLogin = async (req, res) => {
 };
 
 /**
- * Teacher/Faculty Register Handler (Self-Registration)
- * POST /api/auth/teacher/register or POST /api/auth/faculty/register
+- Teacher/Faculty Register Handler (Self-Registration)
+- POST /api/auth/teacher/register or POST /api/auth/faculty/register
  */
 exports.facultyRegister = exports.teacherRegister = async (req, res) => {
     let { employee_id, name, email, password, phone, department_id } = req.body;
@@ -194,8 +194,8 @@ exports.facultyRegister = exports.teacherRegister = async (req, res) => {
 };
 
 /**
- * Teacher/Faculty Login Handler
- * POST /api/auth/teacher/login or POST /api/auth/faculty/login
+- Teacher/Faculty Login Handler
+- POST /api/auth/teacher/login or POST /api/auth/faculty/login
  */
 exports.facultyLogin = exports.teacherLogin = async (req, res) => {
     const { employee_id, email, password } = req.body;
@@ -257,8 +257,8 @@ exports.facultyLogin = exports.teacherLogin = async (req, res) => {
 };
 
 /**
- * Student Register Handler (Self-Registration)
- * POST /api/auth/student/register
+- Student Register Handler (Self-Registration)
+- POST /api/auth/student/register
  */
 exports.studentRegister = async (req, res) => {
     const { enrollment_no, roll_no, name, email, password, phone, section_id, course_id, semester_id, semester } = req.body;
@@ -322,8 +322,8 @@ exports.studentRegister = async (req, res) => {
 };
 
 /**
- * Student Login Handler
- * POST /api/auth/student/login
+- Student Login Handler
+- POST /api/auth/student/login
  */
 exports.studentLogin = async (req, res) => {
     const { enrollment_no, password } = req.body;
@@ -384,8 +384,8 @@ exports.studentLogin = async (req, res) => {
 };
 
 /**
- * Send OTP to Student or Faculty Email for Registration Verification
- * POST /api/auth/send-otp
+- Send OTP to Student or Faculty Email for Registration Verification
+- POST /api/auth/send-otp
  */
 exports.sendOtp = async (req, res) => {
     const { email, role } = req.body;
@@ -430,35 +430,62 @@ exports.sendOtp = async (req, res) => {
             role: isFaculty ? 'Faculty' : 'Student'
         });
 
-        // 3. Attempt to send via Nodemailer if configured
-        const transporter = getEmailTransporter();
-        if (transporter) {
-            const mailOptions = {
-                from: `"Smart QR Attendance System" <${process.env.EMAIL_USER}>`,
-                to: normalizedEmail,
-                subject: `Verification Code - Smart QR ${isFaculty ? 'Faculty' : 'Student'} Registration: ${otp}`,
-                html: `
-                    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 540px; margin: auto; padding: 28px; background: #0f172a; border-radius: 16px; color: #f8fafc; border: 1px solid rgba(255,255,255,0.1);">
-                        <div style="text-align: center; margin-bottom: 24px;">
-                            <h2 style="color: ${isFaculty ? '#0d9488' : '#6366f1'}; margin: 0; font-size: 24px; font-weight: 800;">Smart QR Attendance</h2>
-                            <p style="color: #94a3b8; font-size: 13px; margin-top: 4px;">${portalName} Email Verification</p>
-                        </div>
-                        <div style="background: rgba(30, 41, 59, 0.7); border-radius: 12px; padding: 20px; text-align: center; border: 1px solid rgba(255,255,255,0.08);">
-                            <p style="color: #cbd5e1; font-size: 14px; margin-bottom: 12px;">Hello ${roleTitle}, your one-time verification code is:</p>
-                            <div style="font-size: 32px; font-weight: 800; letter-spacing: 6px; color: ${isFaculty ? '#2dd4bf' : '#38bdf8'}; background: #0b1329; padding: 12px 20px; border-radius: 8px; display: inline-block; border: 1px solid rgba(45, 212, 191, 0.3);">
-                                ${otp}
-                            </div>
-                            <p style="color: #94a3b8; font-size: 12px; margin-top: 14px;">⏱ Valid for <strong>10 minutes</strong>. Do not share this code with anyone.</p>
-                        </div>
-                        <p style="color: #64748b; font-size: 11px; text-align: center; margin-top: 20px;">If you did not request this OTP, please ignore this email.</p>
+        const emailSubject = `Verification Code - Smart QR ${isFaculty ? 'Faculty' : 'Student'} Registration: ${otp}`;
+        const emailHtml = `
+            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 540px; margin: auto; padding: 28px; background: #0f172a; border-radius: 16px; color: #f8fafc; border: 1px solid rgba(255,255,255,0.1);">
+                <div style="text-align: center; margin-bottom: 24px;">
+                    <h2 style="color: ${isFaculty ? '#0d9488' : '#6366f1'}; margin: 0; font-size: 24px; font-weight: 800;">Smart QR Attendance</h2>
+                    <p style="color: #94a3b8; font-size: 13px; margin-top: 4px;">${portalName} Email Verification</p>
+                </div>
+                <div style="background: rgba(30, 41, 59, 0.7); border-radius: 12px; padding: 20px; text-align: center; border: 1px solid rgba(255,255,255,0.08);">
+                    <p style="color: #cbd5e1; font-size: 14px; margin-bottom: 12px;">Hello ${roleTitle}, your one-time verification code is:</p>
+                    <div style="font-size: 32px; font-weight: 800; letter-spacing: 6px; color: ${isFaculty ? '#2dd4bf' : '#38bdf8'}; background: #0b1329; padding: 12px 20px; border-radius: 8px; display: inline-block; border: 1px solid rgba(45, 212, 191, 0.3);">
+                        ${otp}
                     </div>
-                `
-            };
+                    <p style="color: #94a3b8; font-size: 12px; margin-top: 14px;">⏱ Valid for <strong>10 minutes</strong>. Do not share this code with anyone.</p>
+                </div>
+                <p style="color: #64748b; font-size: 11px; text-align: center; margin-top: 20px;">If you did not request this OTP, please ignore this email.</p>
+            </div>
+        `;
 
-            await transporter.sendMail(mailOptions);
-            console.log(`✅ [OTP] Successfully dispatched ${portalName} OTP email to: ${normalizedEmail}`);
+        // 3. Send via Brevo HTTPS API (Works on Render Free Tier) or fallback to Nodemailer
+        if (process.env.BREVO_API_KEY) {
+            const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+                method: 'POST',
+                headers: {
+                    'accept': 'application/json',
+                    'api-key': process.env.BREVO_API_KEY,
+                    'content-type': 'application/json'
+                },
+                body: JSON.stringify({
+                    sender: {
+                        name: 'Smart QR Attendance System',
+                        email: process.env.EMAIL_USER
+                    },
+                    to: [{ email: normalizedEmail }],
+                    subject: emailSubject,
+                    htmlContent: emailHtml
+                })
+            });
+
+            if (!brevoRes.ok) {
+                const errText = await brevoRes.text();
+                throw new Error(`Brevo API Error (${brevoRes.status}): ${errText}`);
+            }
+            console.log(`✅ [OTP] Brevo dispatched ${portalName} OTP email to: ${normalizedEmail}`);
         } else {
-            console.log(`⚠️ [EMAIL NOT CONFIGURED / DEV MODE] Real-time OTP for ${normalizedEmail} (${portalName}) is: ${otp}`);
+            const transporter = getEmailTransporter();
+            if (transporter) {
+                await transporter.sendMail({
+                    from: `"Smart QR Attendance System" <${process.env.EMAIL_USER}>`,
+                    to: normalizedEmail,
+                    subject: emailSubject,
+                    html: emailHtml
+                });
+                console.log(`✅ [OTP] Successfully dispatched ${portalName} OTP email to: ${normalizedEmail}`);
+            } else {
+                console.log(`⚠️ [EMAIL NOT CONFIGURED / DEV MODE] Real-time OTP for ${normalizedEmail} (${portalName}) is: ${otp}`);
+            }
         }
 
         return res.status(200).json({
@@ -476,8 +503,8 @@ exports.sendOtp = async (req, res) => {
 };
 
 /**
- * Verify OTP
- * POST /api/auth/verify-otp
+- Verify OTP
+- POST /api/auth/verify-otp
  */
 exports.verifyOtp = async (req, res) => {
     const { email, otp } = req.body;
