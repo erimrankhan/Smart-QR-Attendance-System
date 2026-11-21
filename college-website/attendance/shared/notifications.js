@@ -10,8 +10,8 @@
             ? window.location.origin 
             : "http://localhost:5000");
 
-    const BASE_SERVER_URL = window.BACKEND_API_URL;
-    const NOTIFICATION_API = `${BASE_SERVER_URL}/api/notifications`;
+    var BASE_SERVER_URL = window.BACKEND_API_URL;
+    var NOTIFICATION_API = `${BASE_SERVER_URL}/api/notifications`;
 
     let shownNotifIds = new Set();
     let isFirstFetch = true;

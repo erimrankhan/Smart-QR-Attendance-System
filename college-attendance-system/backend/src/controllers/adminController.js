@@ -631,7 +631,7 @@ exports.getSubjectFormData = async (req, res) => {
  */
 exports.createSubject = async (req, res) => {
     console.log("Received body:", req.body);
-    const { course_id, semester_id, department_id, name, code, type } = req.body;
+    const { course_id, semester_id, semester, department_id, name, code, type } = req.body;
 
     // 1. Explicit Payload Validation
     if (!name || !name.toString().trim() || !code || !code.toString().trim()) {
@@ -642,18 +642,64 @@ exports.createSubject = async (req, res) => {
     }
 
     // 2. Type Casting & Sanitization
-    const parsedCourseId = (course_id !== undefined && course_id !== null && course_id !== '' && !isNaN(parseInt(course_id, 10))) ? parseInt(course_id, 10) : null;
-    const parsedSemesterId = (semester_id !== undefined && semester_id !== null && semester_id !== '' && !isNaN(parseInt(semester_id, 10))) ? parseInt(semester_id, 10) : null;
-    const parsedDepartmentId = (department_id !== undefined && department_id !== null && department_id !== '' && !isNaN(parseInt(department_id, 10))) ? parseInt(department_id, 10) : null;
+    let parsedCourseId = (course_id !== undefined && course_id !== null && course_id !== '' && !isNaN(parseInt(course_id, 10))) ? parseInt(course_id, 10) : null;
+    const rawSem = semester_id !== undefined && semester_id !== null && semester_id !== '' ? semester_id : semester;
+    const parsedSemesterInput = (rawSem !== undefined && rawSem !== null && rawSem !== '' && !isNaN(parseInt(rawSem, 10))) ? parseInt(rawSem, 10) : null;
+    let parsedDepartmentId = (department_id !== undefined && department_id !== null && department_id !== '' && !isNaN(parseInt(department_id, 10))) ? parseInt(department_id, 10) : null;
     const cleanName = name.toString().trim();
     const cleanCode = code.toString().trim().toUpperCase();
     const cleanType = (type && ['Theory', 'Practical'].includes(type)) ? type : 'Theory';
 
     try {
+        // 3. Auto-resolve Department ID from Course if missing or invalid
+        if (parsedCourseId) {
+            const [courseRows] = await pool.query('SELECT id, department_id FROM Courses WHERE id = ? LIMIT 1', [parsedCourseId]);
+            if (courseRows.length === 0) {
+                parsedCourseId = null;
+            } else if (!parsedDepartmentId && courseRows[0].department_id) {
+                parsedDepartmentId = courseRows[0].department_id;
+            }
+        }
+
+        if (parsedDepartmentId) {
+            const [deptRows] = await pool.query('SELECT id FROM Departments WHERE id = ? LIMIT 1', [parsedDepartmentId]);
+            if (deptRows.length === 0) {
+                parsedDepartmentId = null;
+            }
+        }
+
+        // 4. Permanent Foreign-Key Safe Guard for Semester ID (Maps semester_number -> actual Semesters.id or auto-creates)
+        let finalSemesterId = null;
+        if (parsedSemesterInput) {
+            if (parsedCourseId) {
+                const [semByCourse] = await pool.query(
+                    'SELECT id FROM Semesters WHERE course_id = ? AND (semester_number = ? OR id = ?) LIMIT 1',
+                    [parsedCourseId, parsedSemesterInput, parsedSemesterInput]
+                );
+                if (semByCourse.length > 0) {
+                    finalSemesterId = semByCourse[0].id;
+                } else {
+                    const [insertSem] = await pool.query(
+                        'INSERT INTO Semesters (course_id, semester_number) VALUES (?, ?)',
+                        [parsedCourseId, parsedSemesterInput]
+                    );
+                    finalSemesterId = insertSem.insertId;
+                }
+            } else {
+                const [semDirect] = await pool.query(
+                    'SELECT id FROM Semesters WHERE id = ? OR semester_number = ? LIMIT 1',
+                    [parsedSemesterInput, parsedSemesterInput]
+                );
+                if (semDirect.length > 0) {
+                    finalSemesterId = semDirect[0].id;
+                }
+            }
+        }
+
         const [result] = await pool.query(
             `INSERT INTO Subjects (department_id, course_id, semester_id, name, code, type) 
              VALUES (?, ?, ?, ?, ?, ?)`,
-            [parsedDepartmentId, parsedCourseId, parsedSemesterId, cleanName, cleanCode, cleanType]
+            [parsedDepartmentId, parsedCourseId, finalSemesterId, cleanName, cleanCode, cleanType]
         );
 
         res.status(201).json({
@@ -663,18 +709,16 @@ exports.createSubject = async (req, res) => {
                 id: result.insertId,
                 department_id: parsedDepartmentId,
                 course_id: parsedCourseId,
-                semester_id: parsedSemesterId,
+                semester_id: finalSemesterId,
                 name: cleanName,
                 code: cleanCode,
                 type: cleanType
             }
         });
     } catch (error) {
-        // 3. Detailed Logging
         console.error("MySQL Error:", error.message);
         console.error("Database Error details:", error);
 
-        // 4. Graceful Error Response
         if (error.code === 'ER_DUP_ENTRY') {
             return res.status(409).json({
                 status: 'fail',
@@ -696,7 +740,6 @@ exports.createSubject = async (req, res) => {
         });
     }
 };
-
 /**
  * Fetch All Subjects with Course, Semester and Department Details
  * GET /api/admin/subjects
