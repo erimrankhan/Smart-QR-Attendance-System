@@ -586,19 +586,35 @@ function renderQRCode(qrData) {
 
     const textToEncode = (typeof qrData === 'object' && qrData !== null) ? JSON.stringify(qrData) : qrData;
     container.innerHTML = '';
-    
+
+    // Clean white quiet-zone border taaki dark background par camera turant focus kare
+    container.style.display = 'inline-block';
+    container.style.background = '#ffffff';
+    container.style.padding = '12px';
+    container.style.borderRadius = '10px';
+    container.style.lineHeight = '0';
+
     if (typeof QRCode !== 'undefined') {
         qrCodeInstance = new QRCode(container, {
             text: textToEncode,
-            width: 220,
-            height: 220,
-            colorDark: '#0f172a',
+            width: 512,  // High-DPI internal resolution for razor-sharp edges
+            height: 512,
+            colorDark: '#000000',  // Pure black for maximum camera contrast
             colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.H
+            correctLevel: QRCode.CorrectLevel.M // Bade aur khule dots (door se instant scan ke liye)
         });
+
+        // Display size wahi 220px rakhein, bina kisi blur ke
+        setTimeout(() => {
+            const qrElements = container.querySelectorAll('canvas, img');
+            qrElements.forEach(el => {
+                el.style.width = '220px';
+                el.style.height = '220px';
+                el.style.imageRendering = 'pixelated';
+            });
+        }, 0);
     }
 }
-
 function startCountdown(seconds) {
     clearInterval(countdownTimer);
     remainingSeconds = seconds;

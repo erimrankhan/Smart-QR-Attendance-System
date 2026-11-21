@@ -723,10 +723,27 @@ function startCameraScan() {
     if (isScanning) return;
 
     if (!html5QrcodeScanner) {
-        html5QrcodeScanner = new Html5Qrcode("qr-reader");
+        html5QrcodeScanner = new Html5Qrcode("qr-reader", {
+            experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true // Hardware-accelerated instant detection
+            }
+        });
     }
 
-    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+    const config = {
+        fps: 30, // 3x faster frame scanning
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            const boxSize = Math.floor(minEdge * 0.78); // Bada scan area taaki door se bhi turant pakde
+            return { width: boxSize, height: boxSize };
+        },
+        videoConstraints: {
+            facingMode: "environment",
+            width: { min: 1280, ideal: 1920 }, // Razor-sharp HD camera feed
+            height: { min: 720, ideal: 1080 },
+            advanced: [{ focusMode: "continuous" }] // Auto-focus lock
+        }
+    };
 
     html5QrcodeScanner.start(
         { facingMode: "environment" },
@@ -736,7 +753,7 @@ function startCameraScan() {
     ).then(() => {
         isScanning = true;
         if (feedbackEl) {
-            feedbackEl.textContent = 'Camera active. Align QR code within scanner box.';
+            feedbackEl.textContent = 'Camera active (HD Fast-Scan). Point at QR code.';
             feedbackEl.style.color = '#10b981';
         }
     }).catch(err => {
