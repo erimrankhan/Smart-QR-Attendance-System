@@ -3,7 +3,7 @@
  */
 
 // Auto-detect Localhost vs Live Render URL
-const defaultBaseUrl = window.location.protocol.startsWith('http')
+var defaultBaseUrl = window.location.protocol.startsWith('http')
     ? window.location.origin
     : 'http://localhost:5000';
 

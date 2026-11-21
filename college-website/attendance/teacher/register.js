@@ -8,8 +8,8 @@ window.BACKEND_API_URL = window.API_BASE_URL ||
         ? window.location.origin 
         : "http://localhost:5000");
 
-const BASE_SERVER_URL = window.BACKEND_API_URL;
-const AUTH_API_URL = `${BASE_SERVER_URL}/api/auth`;
+var BASE_SERVER_URL = window.BACKEND_API_URL;
+var AUTH_API_URL = `${BASE_SERVER_URL}/api/auth`;
 
 // Faculty OTP Verification State
 let isFacultyEmailVerified = false;

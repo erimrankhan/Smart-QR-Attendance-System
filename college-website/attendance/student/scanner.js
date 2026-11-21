@@ -10,7 +10,7 @@ window.BACKEND_API_URL = window.API_BASE_URL ||
         ? window.location.origin 
         : "http://localhost:5000");
 
-const BASE_SERVER_URL = window.BACKEND_API_URL;
+var BASE_SERVER_URL = window.BACKEND_API_URL;
 
 /**
  * Global scanner processing flag to prevent race conditions during camera scanning

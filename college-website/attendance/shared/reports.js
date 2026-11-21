@@ -8,8 +8,8 @@ window.BACKEND_API_URL = window.API_BASE_URL ||
         ? window.location.origin 
         : "http://localhost:5000");
 
-const BASE_SERVER_URL = window.BACKEND_API_URL;
-const REPORTS_API = `${BASE_SERVER_URL}/api/reports`;
+var BASE_SERVER_URL = window.BACKEND_API_URL;
+var REPORTS_API = `${BASE_SERVER_URL}/api/reports`;
 
 let dailyTrendChartInstance = null;
 let ratioChartInstance = null;

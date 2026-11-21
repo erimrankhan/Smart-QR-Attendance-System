@@ -9,9 +9,9 @@ window.BACKEND_API_URL = window.API_BASE_URL ||
         ? window.location.origin 
         : "http://localhost:5000");
 
-const BASE_SERVER_URL = window.BACKEND_API_URL;
-const SERVER_URL = BASE_SERVER_URL;
-const API_BASE_URL = `${SERVER_URL}/api`;
+var BASE_SERVER_URL = window.BACKEND_API_URL;
+var SERVER_URL = BASE_SERVER_URL;
+var API_BASE_URL = `${SERVER_URL}/api`;
 
 // Utility helper to get JWT Authorization headers
 function getAuthHeaders() {
