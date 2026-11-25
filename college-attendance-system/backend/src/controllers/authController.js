@@ -260,8 +260,12 @@ exports.facultyLogin = exports.teacherLogin = async (req, res) => {
 - Student Register Handler (Self-Registration)
 - POST /api/auth/student/register
  */
+/**
+- Student Register Handler (Self-Registration)
+- POST /api/auth/student/register
+ */
 exports.studentRegister = async (req, res) => {
-    const { enrollment_no, roll_no, name, email, password, phone, section_id, course_id, semester_id, semester } = req.body;
+    const { enrollment_no, roll_no, name, email, password, phone, section_id, section, course_id, semester_id, semester } = req.body;
 
     // Strict Validation
     if (!enrollment_no || !name || !email || !password) {
@@ -272,20 +276,67 @@ exports.studentRegister = async (req, res) => {
     }
 
     try {
-        let parsedSectionId = null;
-        if (section_id !== undefined && section_id !== null && section_id !== '') {
-            if (!isNaN(parseInt(section_id, 10))) {
-                parsedSectionId = parseInt(section_id, 10);
-            } else if (typeof section_id === 'string') {
-                const [foundSec] = await pool.query('SELECT id FROM Sections WHERE name = ? LIMIT 1', [section_id.trim()]);
-                if (foundSec.length > 0) {
-                    parsedSectionId = foundSec[0].id;
+        // 1. Verify Course Exists (Foreign Key Safe Guard)
+        let parsedCourseId = (course_id && !isNaN(parseInt(course_id, 10))) ? parseInt(course_id, 10) : null;
+        if (parsedCourseId) {
+            const [courseRows] = await pool.query('SELECT id FROM Courses WHERE id = ? LIMIT 1', [parsedCourseId]);
+            if (courseRows.length === 0) {
+                parsedCourseId = null;
+            }
+        }
+
+        // 2. Resolve or Auto-Insert Semester (Maps semester_number -> actual Semesters.id)
+        const rawSem = semester_id !== undefined && semester_id !== null && semester_id !== '' ? semester_id : semester;
+        const parsedSemNum = (rawSem && !isNaN(parseInt(rawSem, 10))) ? parseInt(rawSem, 10) : null;
+        let parsedSemesterId = null;
+
+        if (parsedSemNum) {
+            let semQuery = 'SELECT id FROM Semesters WHERE id = ?';
+            let semParams = [parsedSemNum];
+
+            if (parsedCourseId) {
+                semQuery = 'SELECT id FROM Semesters WHERE (course_id = ? AND (semester_number = ? OR id = ?)) OR id = ?';
+                semParams = [parsedCourseId, parsedSemNum, parsedSemNum, parsedSemNum];
+            } else {
+                semQuery = 'SELECT id FROM Semesters WHERE id = ? OR semester_number = ?';
+                semParams = [parsedSemNum, parsedSemNum];
+            }
+
+            const [semRows] = await pool.query(`${semQuery} LIMIT 1`, semParams);
+            if (semRows.length > 0) {
+                parsedSemesterId = semRows[0].id;
+            } else if (parsedCourseId) {
+                try {
+                    const [insertSem] = await pool.query(
+                        'INSERT INTO Semesters (course_id, semester_number) VALUES (?, ?)',
+                        [parsedCourseId, parsedSemNum]
+                    );
+                    parsedSemesterId = insertSem.insertId;
+                } catch (e) {
+                    parsedSemesterId = null;
                 }
             }
         }
 
-        const parsedCourseId = (course_id && !isNaN(parseInt(course_id, 10))) ? parseInt(course_id, 10) : null;
-        const parsedSemesterId = (semester_id || semester) && !isNaN(parseInt(semester_id || semester, 10)) ? parseInt(semester_id || semester, 10) : 1;
+        // 3. Resolve or Auto-Insert Section (Maps Section Name 'A'/'B' or ID -> actual Sections.id)
+        const rawSec = section_id !== undefined && section_id !== null && section_id !== '' ? section_id : section;
+        let parsedSectionId = null;
+
+        if (rawSec) {
+            if (isNaN(parseInt(rawSec, 10))) {
+                const secName = rawSec.toString().trim().toUpperCase();
+                const [secRows] = await pool.query('SELECT id FROM Sections WHERE name = ? LIMIT 1', [secName]);
+                if (secRows.length > 0) {
+                    parsedSectionId = secRows[0].id;
+                } else {
+                    const [insertSec] = await pool.query('INSERT INTO Sections (name) VALUES (?)', [secName]);
+                    parsedSectionId = insertSec.insertId;
+                }
+            } else {
+                const [secCheck] = await pool.query('SELECT id FROM Sections WHERE id = ? LIMIT 1', [parseInt(rawSec, 10)]);
+                parsedSectionId = secCheck.length > 0 ? secCheck[0].id : null;
+            }
+        }
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -315,7 +366,7 @@ exports.studentRegister = async (req, res) => {
             return res.status(409).json({ status: 'fail', message: 'An account with this Email or Enrollment Number already exists.' });
         }
         if (error.code === 'ER_NO_REFERENCED_ROW_2' || error.code === 'ER_NO_REFERENCED_ROW') {
-            return res.status(400).json({ status: 'fail', message: 'Selected Section or Course ID does not exist in database.' });
+            return res.status(400).json({ status: 'fail', message: 'Selected Section, Course, or Semester does not exist in database.' });
         }
         res.status(500).json({ status: 'error', message: 'Internal server error during student registration.' });
     }

@@ -458,8 +458,12 @@ function startQuickSession(classId) {
 window.startQuickSession = startQuickSession;
 
 /**
- * 3. ATTENDANCE & LIVE POLLING
+ * 3. ATTENDANCE & LIVE POLLING (ULTRA-FAST COMPACT QR)
  */
+function buildCompactQrPayload(sessionId, qrHash, sessionPin) {
+    return `ATT|${sessionId}|${qrHash || sessionId}|${sessionPin || ''}`;
+}
+
 async function startAttendanceSession() {
     const select = document.getElementById('class-select');
     const classId = select ? select.value : '';
@@ -482,27 +486,10 @@ async function startAttendanceSession() {
             const sessionPin = resData.session_pin || resData.sessionPin || resData.pin || resData.data?.session_pin || resData.data?.sessionPin || resData.data?.pin;
             
             activeSessionId = sessionId;
-
             updateSessionPinDisplay(sessionPin);
 
-            const selectedClass = (Array.isArray(currentAssignedClasses))
-                ? (currentAssignedClasses.find(c => (c.class_id == classId || c.id == classId)) || {})
-                : {};
-
-            const qrPayload = {
-                session_id: sessionId,
-                course_id: selectedClass.course_id || 'CS-2026',
-                subject_id: selectedClass.subject_id || selectedClass.subject_code || 'SUB-101',
-                qrHash: qrHash,
-                pin: sessionPin,
-                timestamp: Date.now()
-            };
-
-            if (typeof generateFacultyQRCode === 'function') {
-                generateFacultyQRCode(qrPayload);
-            } else {
-                renderQRCode(qrPayload);
-            }
+            const compactQr = buildCompactQrPayload(sessionId, qrHash, sessionPin);
+            renderQRCode(compactQr);
 
             const activeContainer = document.getElementById('session-active-container');
             if (activeContainer) activeContainer.style.display = 'block';
@@ -549,25 +536,8 @@ async function regenerateActiveQR() {
 
             updateSessionPinDisplay(sessionPin);
 
-            const selectedClassId = document.getElementById('class-select')?.value;
-            const selectedClass = (Array.isArray(currentAssignedClasses))
-                ? (currentAssignedClasses.find(c => c.class_id == selectedClassId || c.id == selectedClassId) || {})
-                : {};
-
-            const qrPayload = {
-                session_id: activeSessionId,
-                course_id: selectedClass.course_id || 'CS-2026',
-                subject_id: selectedClass.subject_id || selectedClass.subject_code || 'SUB-101',
-                qrHash: qrHash,
-                pin: sessionPin,
-                timestamp: Date.now()
-            };
-
-            if (typeof generateFacultyQRCode === 'function') {
-                generateFacultyQRCode(qrPayload);
-            } else {
-                renderQRCode(qrPayload);
-            }
+            const compactQr = buildCompactQrPayload(activeSessionId, qrHash, sessionPin);
+            renderQRCode(compactQr);
 
             startCountdown(60);
             showToast(`QR & PIN regenerated! New PIN: ${sessionPin || 'Active'}`, 'success');
@@ -584,14 +554,17 @@ function renderQRCode(qrData) {
     const container = document.getElementById('qrcode');
     if (!container) return;
 
-    const textToEncode = (typeof qrData === 'object' && qrData !== null) ? JSON.stringify(qrData) : qrData;
+    const textToEncode = (typeof qrData === 'object' && qrData !== null)
+        ? buildCompactQrPayload(qrData.session_id, qrData.qrHash, qrData.pin)
+        : String(qrData);
+
     container.innerHTML = '';
 
     // Clean white quiet-zone border taaki dark background par camera turant focus kare
     container.style.display = 'inline-block';
     container.style.background = '#ffffff';
-    container.style.padding = '12px';
-    container.style.borderRadius = '10px';
+    container.style.padding = '14px';
+    container.style.borderRadius = '12px';
     container.style.lineHeight = '0';
 
     if (typeof QRCode !== 'undefined') {
@@ -601,13 +574,12 @@ function renderQRCode(qrData) {
             height: 512,
             colorDark: '#000000',  // Pure black for maximum camera contrast
             colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.M // Bade aur khule dots (door se instant scan ke liye)
+            correctLevel: QRCode.CorrectLevel.L // Bade aur crystal-clear blocks
         });
 
         // Display size wahi 220px rakhein, bina kisi blur ke
         setTimeout(() => {
-            const qrElements = container.querySelectorAll('canvas, img');
-            qrElements.forEach(el => {
+            container.querySelectorAll('canvas, img').forEach(el => {
                 el.style.width = '220px';
                 el.style.height = '220px';
                 el.style.imageRendering = 'pixelated';
@@ -615,6 +587,7 @@ function renderQRCode(qrData) {
         }, 0);
     }
 }
+
 function startCountdown(seconds) {
     clearInterval(countdownTimer);
     remainingSeconds = seconds;

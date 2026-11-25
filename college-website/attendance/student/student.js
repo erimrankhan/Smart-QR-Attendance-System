@@ -1,6 +1,6 @@
 /**
  * Smart QR Attendance System - Complete Student Portal Logic
- * Modules 1-5: Dashboard, QR Scanner, Attendance Analytics, Profile, Leaves/Alerts, and Reports
+ * Modules 1-6: Dashboard, Instant QR Scanner, Attendance Analytics, Profile, Leaves/Alerts, Reports & Materials
  */
 
 // Localhost Backend Configuration
@@ -20,7 +20,6 @@ let currentReportData = [];
 
 // Initialize on DOM Load
 document.addEventListener('DOMContentLoaded', async () => {
-    // Dismiss any hanging loaders immediately on page entrance
     if (typeof hideLoading === 'function') hideLoading();
     const hungLoader = document.getElementById('global-loader');
     if (hungLoader) {
@@ -46,7 +45,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (typeof hideLoading === 'function') hideLoading();
     }
 
-    // Show login toast on right side when landing on dashboard
     if (sessionStorage.getItem('justLoggedIn') === 'true') {
         sessionStorage.removeItem('justLoggedIn');
         const userStr = localStorage.getItem('studentUser') || localStorage.getItem('user');
@@ -626,7 +624,7 @@ async function loadDashboardData() {
 
 /**
  * --------------------------------------------------------------------------
- * MODULE 2: QR SCANNER ENGINE
+ * MODULE 2: INSTANT PAYTM-STYLE QR SCANNER ENGINE
  * --------------------------------------------------------------------------
  */
 function initScannerControls() {
@@ -725,23 +723,20 @@ function startCameraScan() {
     if (!html5QrcodeScanner) {
         html5QrcodeScanner = new Html5Qrcode("qr-reader", {
             experimentalFeatures: {
-                useBarCodeDetectorIfSupported: true // Hardware-accelerated instant detection
+                useBarCodeDetectorIfSupported: true // Phone ka native hardware scanner
             }
         });
     }
 
+    // Bina qrbox ke poori camera screen ek saath scan hogi (Zero alignment wait)
     const config = {
-        fps: 30, // 3x faster frame scanning
-        qrbox: function(viewfinderWidth, viewfinderHeight) {
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            const boxSize = Math.floor(minEdge * 0.78); // Bada scan area taaki door se bhi turant pakde
-            return { width: boxSize, height: boxSize };
-        },
+        fps: 30,
+        disableFlip: false,
         videoConstraints: {
             facingMode: "environment",
-            width: { min: 1280, ideal: 1920 }, // Razor-sharp HD camera feed
+            width: { min: 1280, ideal: 1920 },
             height: { min: 720, ideal: 1080 },
-            advanced: [{ focusMode: "continuous" }] // Auto-focus lock
+            advanced: [{ focusMode: "continuous" }]
         }
     };
 
@@ -753,7 +748,7 @@ function startCameraScan() {
     ).then(() => {
         isScanning = true;
         if (feedbackEl) {
-            feedbackEl.textContent = 'Camera active (HD Fast-Scan). Point at QR code.';
+            feedbackEl.textContent = 'Ready! Camera ke saamne QR laate hi scan hoga.';
             feedbackEl.style.color = '#10b981';
         }
     }).catch(err => {
@@ -778,53 +773,57 @@ function stopCameraScan() {
     }
 }
 
-async function onQrCodeScanned(decodedText, decodedResult) {
-    if (typeof onScanSuccess === 'function') {
-        return await onScanSuccess(decodedText, decodedResult);
-    }
-
+async function onQrCodeScanned(decodedText) {
     if (isProcessingScan) return;
     isProcessingScan = true;
 
-    showToast('QR Code Detected! Validating session...', 'info');
+    // Turant camera stop karein taaki 0.1s mein response mile aur duplicate scan na ho
+    stopCameraScan();
+    showToast('QR Detected! Marking attendance...', 'info');
 
     try {
-        let parsedData = null;
-        try {
-            parsedData = JSON.parse(decodedText);
-        } catch (e) {
-            throw new Error('Invalid JSON format');
+        let sessionId = null;
+        let qrHash = null;
+        let pin = null;
+
+        if (typeof decodedText === 'string' && decodedText.startsWith('ATT|')) {
+            // Fast compact format: ATT|sessionId|qrHash|pin
+            const parts = decodedText.split('|');
+            sessionId = parts[1];
+            qrHash = parts[2] || sessionId;
+            pin = parts[3] || null;
+        } else {
+            // Legacy JSON format fallback
+            const parsedData = JSON.parse(decodedText);
+            sessionId = parsedData.session_id || parsedData.sessionId;
+            qrHash = parsedData.qrHash || parsedData.qr_hash || sessionId;
+            pin = parsedData.pin || parsedData.session_pin || null;
         }
 
-        const sessionId = parsedData.session_id || parsedData.sessionId;
-        const courseId = parsedData.course_id || parsedData.courseId;
-        const timestamp = parsedData.timestamp;
-
-        if (!sessionId || !courseId) {
-            throw new Error('Missing required QR keys: session_id or course_id.');
+        if (!sessionId && !pin) {
+            throw new Error('Invalid QR Code.');
         }
 
-        if (timestamp) {
-            const ageInMs = Date.now() - timestamp;
-            if (isNaN(ageInMs) || ageInMs > 120000) {
-                throw new Error('QR code expired (older than 2 minutes).');
-            }
-        }
+        const payload = {
+            sessionId: sessionId,
+            session_id: sessionId,
+            qrHash: qrHash
+        };
+        if (pin) payload.pin = String(pin);
 
         const response = await fetch(`${API_BASE_URL}/mark-attendance`, {
             method: 'POST',
             headers: getAuthHeaders(),
-            body: JSON.stringify({
-                sessionId: sessionId,
-                qrHash: parsedData.qrHash || parsedData.qr_hash || sessionId
-            })
+            body: JSON.stringify(payload)
         });
         const resData = await response.json();
 
-        if (response.ok && resData.status === 'success') {
-            showToast(resData.message || 'Attendance marked successfully!');
-            stopCameraScan();
-            setTimeout(() => switchView('dashboard-view'), 1200);
+        if (response.ok && (resData.status === 'success' || resData.success === true)) {
+            showToast(resData.message || 'Attendance marked successfully!', 'success');
+            setTimeout(() => {
+                loadDashboardData();
+                switchView('dashboard-view');
+            }, 800);
         } else {
             const errMsg = resData.message || 'Failed to mark attendance.';
             if (typeof triggerGlassmorphismErrorPopup === 'function') {
@@ -835,14 +834,14 @@ async function onQrCodeScanned(decodedText, decodedResult) {
         }
     } catch (err) {
         console.error('QR Scanner Validation Error:', err.message);
-        const errorMessage = "Invalid QR Format. Please scan a valid live attendance QR code generated by your Faculty.";
+        const errorMessage = 'Invalid QR Code. Please scan a live attendance QR code.';
         if (typeof triggerGlassmorphismErrorPopup === 'function') {
             triggerGlassmorphismErrorPopup(errorMessage);
         } else {
             showToast(errorMessage, 'error');
         }
     } finally {
-        setTimeout(() => { isProcessingScan = false; }, 3000);
+        setTimeout(() => { isProcessingScan = false; }, 1500);
     }
 }
 

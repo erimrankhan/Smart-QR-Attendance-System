@@ -9,9 +9,37 @@ if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+// Memoized helper to auto-create Resources table if missing in database
+let resourcesTableInitPromise = null;
+const ensureResourcesTable = () => {
+    if (!resourcesTableInitPromise) {
+        resourcesTableInitPromise = pool.query(`
+            CREATE TABLE IF NOT EXISTS Resources (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                teacher_id INT NOT NULL,
+                class_id INT NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                file_path VARCHAR(500) NOT NULL,
+                resource_type VARCHAR(50),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `).catch(err => {
+            resourcesTableInitPromise = null;
+            console.error('Resources Table Init Warning:', err.message);
+        });
+    }
+    return resourcesTableInitPromise;
+};
+
+// Initialize table on startup
+ensureResourcesTable();
+
 // Multer Storage Configuration
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
         cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
@@ -56,6 +84,8 @@ exports.uploadResource = async (req, res) => {
     }
 
     try {
+        await ensureResourcesTable();
+
         const relativePath = `/uploads/${req.file.filename}`;
         const downloadUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
         const ext = path.extname(req.file.originalname).toLowerCase().replace('.', '');
@@ -93,6 +123,8 @@ exports.getClassResources = async (req, res) => {
     const { class_id } = req.params;
 
     try {
+        await ensureResourcesTable();
+
         const [resources] = await pool.query(`
             SELECT r.id, r.title, r.file_path, r.resource_type, r.created_at,
                    r.created_at AS uploaded_at,
@@ -135,6 +167,8 @@ exports.getTeacherResources = async (req, res) => {
     }
 
     try {
+        await ensureResourcesTable();
+
         const [resources] = await pool.query(`
             SELECT r.id, r.title, r.file_path, r.resource_type, r.created_at,
                    r.created_at AS uploaded_at,
@@ -170,10 +204,11 @@ exports.getTeacherResources = async (req, res) => {
 /**
  * Fetch All Resources for Student's Enrolled Course and Semester
  * GET /api/resources/student/materials OR /api/resources/my-resources
- * Fixed: Strictly uses semester_id, course_id, section_id (no 'current_semester')
  */
 exports.getStudentMaterials = async (req, res) => {
     try {
+        await ensureResourcesTable();
+
         const studentId = req.user ? (req.user.id || req.user.student_id) : null;
         let { course_id, semester_id } = req.query;
 
