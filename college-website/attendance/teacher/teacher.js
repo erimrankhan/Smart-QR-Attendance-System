@@ -1,5 +1,5 @@
 /**
- * Smart QR Attendance System - Faculty Portal Suite Logic (Updated & Fixed)
+ * Smart QR Attendance System - Faculty Portal Suite Logic (Updated & Fixed with IST Timezone)
  */
 
 // Localhost Backend Configuration
@@ -20,6 +20,23 @@ let qrCodeInstance = null;
 let remainingSeconds = 60;
 let currentReportData = null;
 let currentAssignedClasses = [];
+
+// UTC Database Timestamp ko Exact Indian Standard Time (IST) mein convert karne ke liye
+function formatToIST(dateStr, timeOnly = false) {
+    if (!dateStr) return 'Just now';
+    let raw = String(dateStr).trim();
+    if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/.test(raw) && !raw.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(raw)) {
+        raw = raw.replace(' ', 'T') + 'Z';
+    }
+    const dateObj = new Date(raw);
+    if (isNaN(dateObj.getTime())) return dateStr;
+
+    const options = timeOnly
+        ? { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }
+        : { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true };
+
+    return dateObj.toLocaleString('en-IN', options);
+}
 
 // Initialize on Page Load
 document.addEventListener('DOMContentLoaded', async () => {
@@ -404,7 +421,7 @@ async function loadDashboardSummary() {
                         <tr>
                             <td><strong>${s.subject_name}</strong> (${s.subject_code})</td>
                             <td>Section ${s.section_name || 'A'}</td>
-                            <td>${new Date(s.created_at).toLocaleString()}</td>
+                            <td>${formatToIST(s.created_at)}</td>
                             <td><span style="color: var(--accent-emerald); font-weight: 700;">${s.present_count} Present</span></td>
                             <td><span style="background: rgba(255,255,255,0.06); padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 700;">${s.session_status}</span></td>
                         </tr>
@@ -650,7 +667,7 @@ async function fetchLiveScans(sessionId) {
                             <td><strong>${s.roll_no || 'N/A'}</strong></td>
                             <td>${s.student_name || s.name}</td>
                             <td>${s.enrollment_no || '-'}</td>
-                            <td>${s.scanned_at ? new Date(s.scanned_at).toLocaleTimeString() : 'Just now'}</td>
+                            <td>${s.scanned_at ? formatToIST(s.scanned_at, true) : 'Just now'}</td>
                             <td>
                                 <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px; background: rgba(244,63,94,0.15); color: #f43f5e; border: 1px solid rgba(244,63,94,0.3); border-radius: 4px; cursor: pointer;" onclick="manualMarkStudent(${s.student_id || s.id}, 'Absent')">
                                     <i class="fa-solid fa-xmark"></i> Mark Absent
@@ -828,7 +845,7 @@ async function generateAttendanceReport() {
             } else {
                 tbody.innerHTML = reports.map(r => `
                     <tr>
-                        <td>${new Date(r.scanned_at).toLocaleString()}</td>
+                        <td>${formatToIST(r.scanned_at)}</td>
                         <td><strong>${r.subject_name}</strong> (${r.subject_code})</td>
                         <td>Section ${r.section_name || 'A'}</td>
                         <td>${r.student_name}</td>
@@ -858,10 +875,10 @@ function exportReportPDF() {
 
     doc.setFontSize(11);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 28);
+    doc.text(`Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`, 14, 28);
 
     const tableRows = currentReportData.map(r => [
-        new Date(r.scanned_at).toLocaleString(),
+        formatToIST(r.scanned_at),
         r.subject_name,
         r.section_name || 'A',
         r.student_name,
@@ -871,7 +888,7 @@ function exportReportPDF() {
 
     doc.autoTable({
         startY: 35,
-        head: [['Date & Time', 'Subject', 'Section', 'Student Name', 'Enrollment No', 'Status']],
+        head: [['Date & Time (IST)', 'Subject', 'Section', 'Student Name', 'Enrollment No', 'Status']],
         body: tableRows,
         theme: 'striped',
         headStyles: { fillColor: [99, 102, 241] }
@@ -888,11 +905,11 @@ function exportReportExcel() {
     }
 
     let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Date & Time,Subject,Section,Student Name,Enrollment No,Status\n";
+    csvContent += "Date & Time (IST),Subject,Section,Student Name,Enrollment No,Status\n";
 
     currentReportData.forEach(r => {
         const row = [
-            `"${new Date(r.scanned_at).toLocaleString()}"`,
+            `"${formatToIST(r.scanned_at)}"`,
             `"${r.subject_name}"`,
             `"${r.section_name || 'A'}"`,
             `"${r.student_name}"`,
@@ -997,7 +1014,7 @@ async function fetchTeacherResources() {
                 tbody.innerHTML = resources.map(r => {
                     const downloadUrl = r.downloadUrl || (r.file_path ? `${SERVER_URL}${r.file_path}` : `${SERVER_URL}${r.file_url}`);
                     const uploadDate = r.uploaded_at || r.created_at;
-                    const dateDisplay = uploadDate ? new Date(uploadDate).toLocaleDateString() : 'Recent';
+                    const dateDisplay = uploadDate ? formatToIST(uploadDate) : 'Recent';
                     return `
                         <tr>
                             <td>
@@ -1037,7 +1054,7 @@ async function loadSentAnnouncements() {
             }
 
             listEl.innerHTML = announcements.map(a => {
-                const dateStr = a.created_at ? new Date(a.created_at).toLocaleString() : 'Just now';
+                const dateStr = a.created_at ? formatToIST(a.created_at) : 'Just now';
                 const pType = (a.type || a.priority || 'info').toLowerCase();
 
                 let badgeStyle = 'background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3);';
